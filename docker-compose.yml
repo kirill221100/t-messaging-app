@@ -4,7 +4,7 @@ services:
     build: .
     ports:
       - 80:80
-    command: bash -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 80"
+    command: bash -c "alembic upgrade head && gunicorn --workers=3 -b 0.0.0.0:80 -k uvicorn.workers.UvicornWorker main:app"
     environment:
       APP_NAME: "t_base"
     depends_on:
