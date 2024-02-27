@@ -26,10 +26,11 @@ async def registration_path(reg_data: RegisterScheme, back_tasks: BackgroundTask
 @auth_router.post('/login')
 async def login_path(email: EmailStr, back_tasks: BackgroundTasks,
                      session: AsyncSession = Depends(get_session)):
-    user = await get_user_by_email(email, session)
-    verification_code = await create_email_code(user.id)
-    await send_login_email(email, verification_code, back_tasks)
-    return {'msg': 'подтвердите вход, введя код присланный на email', 'id': user.id}
+    if user := await get_user_by_email(email, session):
+        verification_code = await create_email_code(user.id)
+        await send_login_email(email, verification_code, back_tasks)
+        return {'msg': 'подтвердите вход, введя код присланный на email', 'id': user.id}
+    raise HTTPException(404, 'no such user')
 
 
 @auth_router.post('/login-for-debug')
