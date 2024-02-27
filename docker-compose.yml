@@ -30,6 +30,9 @@ services:
     image: redis:7
     container_name: redis
     restart: unless-stopped
+    environment:
+      - REDIS_USER=${REDIS_USER}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./redis/data:/data
     expose:
