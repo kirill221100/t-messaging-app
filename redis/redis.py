@@ -24,5 +24,6 @@ async def create_email_code(user_id: int):
 
 
 async def verify_email_code(user_id: int, code: int):
-    res = await redis.get(user_id)
-    return str(res, encoding='utf-8') == str(code)
+    if res := await redis.get(user_id):
+        return str(res, encoding='utf-8') == str(code)
+    return False
