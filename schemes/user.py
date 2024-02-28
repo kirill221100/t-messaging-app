@@ -6,8 +6,13 @@ class UserResponseScheme(BaseModel):
     id: int
     username: str
     name: str
-    surname: Optional[str]
-    hashed_password: str
+    surname: Optional[str] = None
     email: EmailStr
-    is_verified: bool
 
+
+class EditUserScheme(BaseModel):
+    id: int
+    username: Optional[str] = None
+    name: Optional[str] = None
+    surname: Optional[str] = None
+    email: Optional[EmailStr] = None

@@ -3,11 +3,10 @@ from typing import Optional
 
 
 class RegisterScheme(BaseModel):
+    id: int
     username: str
     name: str
-    surname: Optional[str]
-    password: str
-    email: EmailStr
+    surname: Optional[str] = None
 
 
 class LoginEmailResponseScheme(BaseModel):

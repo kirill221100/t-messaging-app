@@ -4,7 +4,7 @@ from schemes.auth import RegisterScheme, LoginEmailResponseScheme
 from schemes.user import UserResponseScheme
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.db_setup import get_session
-from db.utils.user import create_user, verify_email, get_user_by_email, get_user_by_username
+from db.utils.user import create_user, verify_email, get_user_by_email, get_user_by_username, edit_user
 from security.email import send_email_verification, send_login_email
 from security.jwt import create_access_token, create_refresh_token, verify_refresh_token
 from redis.redis import create_email_code, verify_email_code
@@ -15,12 +15,27 @@ auth_router = APIRouter()
 
 
 @auth_router.post('/registration', response_model=UserResponseScheme)
-async def registration_path(reg_data: RegisterScheme, back_tasks: BackgroundTasks,
-                            session: AsyncSession = Depends(get_session)):
-    user = await create_user(reg_data, session)
-    verification_code = await create_email_code(user.id)
-    await send_email_verification(reg_data.email, verification_code, back_tasks)
+async def registration_path(reg_data: RegisterScheme, session: AsyncSession = Depends(get_session)):
+    user = await edit_user(reg_data, session)
     return user
+
+
+@auth_router.post('/email-reg-send')
+async def email_reg_send_path(email: EmailStr, back_tasks: BackgroundTasks,
+                              session: AsyncSession = Depends(get_session)):
+    user_id = await create_user(email, session)
+    verification_code = await create_email_code(user_id)
+    await send_email_verification(email, verification_code, back_tasks)
+    return {'id': user_id, 'msg': 'подтвердите почту, введя код присланный на email'}
+
+
+@auth_router.get('/email-reg/{user_id}', response_model=LoginEmailResponseScheme)
+async def email_reg_path(user_id: int, code: int):
+    if await verify_email_code(user_id, code):
+        data = {'user_id': user_id}
+        return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
+                'token_type': 'bearer'}
+    raise HTTPException(status_code=400, detail='incorrect code')
 
 
 @auth_router.post('/login')
@@ -53,16 +68,6 @@ async def refresh_token_path(token: str):
 @auth_router.get('/email-login/{user_id}', response_model=LoginEmailResponseScheme)
 async def email_login_path(user_id: int, code: int):
     if await verify_email_code(user_id, code):
-        data = {'user_id': user_id}
-        return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
-                'token_type': 'bearer'}
-    raise HTTPException(status_code=400, detail='incorrect code')
-
-
-@auth_router.get('/verify-email/{user_id}', response_model=LoginEmailResponseScheme)
-async def verify_email_path(user_id: int, code: int, session: AsyncSession = Depends(get_session)):
-    if await verify_email_code(user_id, code):
-        await verify_email(user_id, session)
         data = {'user_id': user_id}
         return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
                 'token_type': 'bearer'}
