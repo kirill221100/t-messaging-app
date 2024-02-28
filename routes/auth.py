@@ -20,7 +20,7 @@ async def registration_path(reg_data: RegisterScheme, session: AsyncSession = De
     return user
 
 
-@auth_router.post('/email-reg-send')
+@auth_router.post('/email-reg-send/{email}')
 async def email_reg_send_path(email: EmailStr, back_tasks: BackgroundTasks,
                               session: AsyncSession = Depends(get_session)):
     user_id = await create_user(email, session)
@@ -29,7 +29,7 @@ async def email_reg_send_path(email: EmailStr, back_tasks: BackgroundTasks,
     return {'id': user_id, 'msg': 'подтвердите почту, введя код присланный на email'}
 
 
-@auth_router.get('/email-reg/{user_id}', response_model=LoginEmailResponseScheme)
+@auth_router.get('/email-reg', response_model=LoginEmailResponseScheme)
 async def email_reg_path(user_id: int, code: int):
     if await verify_email_code(user_id, code):
         data = {'user_id': user_id}
@@ -38,7 +38,7 @@ async def email_reg_path(user_id: int, code: int):
     raise HTTPException(status_code=400, detail='incorrect code')
 
 
-@auth_router.post('/login')
+@auth_router.post('/login/{email}')
 async def login_path(email: EmailStr, back_tasks: BackgroundTasks,
                      session: AsyncSession = Depends(get_session)):
     if user := await get_user_by_email(email, session):
@@ -59,13 +59,13 @@ async def login_for_debug_path(login_data: OAuth2PasswordRequestForm = Depends()
     raise HTTPException(404)
 
 
-@auth_router.post('/refresh-token/{token}')
+@auth_router.get('/refresh-token')
 async def refresh_token_path(token: str):
     if data := verify_refresh_token(token):
         return {'access_token': create_access_token(data), 'token_type': 'bearer'}
 
 
-@auth_router.get('/email-login/{user_id}', response_model=LoginEmailResponseScheme)
+@auth_router.get('/email-login', response_model=LoginEmailResponseScheme)
 async def email_login_path(user_id: int, code: int):
     if await verify_email_code(user_id, code):
         data = {'user_id': user_id}
