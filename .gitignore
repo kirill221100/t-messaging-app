@@ -1,3 +1,4 @@
 /redis/redis.conf
 .env
 .env_prod
+/redis/data/

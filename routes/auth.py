@@ -4,7 +4,7 @@ from schemes.auth import RegisterScheme, LoginEmailResponseScheme
 from schemes.user import UserResponseScheme
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.db_setup import get_session
-from db.utils.user import create_user, verify_email, get_user_by_email, get_user_by_username, edit_user
+from db.utils.user import create_user, verify_email, get_user_by_email, get_user_by_id, edit_user
 from security.email import send_email_verification, send_login_email
 from security.jwt import create_access_token, create_refresh_token, verify_refresh_token
 from redis.redis import create_email_code, verify_email_code
@@ -53,7 +53,7 @@ async def login_for_debug_path(login_data: OAuth2PasswordRequestForm = Depends()
                                session: AsyncSession = Depends(get_session)):
     """вводить только username"""
     if config.DEBUG:
-        user = await get_user_by_username(login_data.username, session)
+        user = await get_user_by_id(int(login_data.username), session)
         data = {'user_id': user.id}
         return {'access_token': create_access_token(data), 'token_type': 'bearer'}
     raise HTTPException(404)

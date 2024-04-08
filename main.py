@@ -1,14 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from redis.redis import redis
 from config import config
 from routes.auth import auth_router
 from routes.user import user_router
+from routes.chat import chat_router
+from routes.message import message_router
 from db.db_setup import init_db
 import uvicorn
 
 
-app = FastAPI(debug=config.DEBUG, title='T')
+@asynccontextmanager
+async def ws_lifespan(app: FastAPI):
+    await init_db()
+    await redis.create_connections()
+    yield
+    await redis.delete_connections()
+
+
+app = FastAPI(lifespan=ws_lifespan, debug=config.DEBUG, title='T')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,11 +29,17 @@ app.add_middleware(
 )
 app.include_router(auth_router, prefix='/auth', tags=['auth'])
 app.include_router(user_router, prefix='/user', tags=['auth'])
+app.include_router(chat_router, prefix='/chat', tags=['chat'])
+app.include_router(message_router, prefix='/message', tags=['message'])
 
 
-@app.on_event('startup')
-async def on_startup():
-    await init_db()
+# @app.on_event('startup')
+# async def on_startup():
+#     await init_db()
+#     await redis.create_connections()
+#     yield
+#     await redis.delete_connections()
+
 
 if __name__ == '__main__':
     uvicorn.run('main:app', reload=True)

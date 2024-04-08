@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from db.models.user import User
 from schemes.auth import RegisterScheme
 from schemes.user import EditUserScheme
@@ -18,6 +19,10 @@ async def get_user_by_email(email: EmailStr, session: AsyncSession):
 
 async def get_user_by_id(user_id: int, session: AsyncSession):
     return (await session.execute(select(User).filter_by(id=user_id))).scalar_one_or_none()
+
+
+async def get_user_by_id_with_chats(user_id: int, session: AsyncSession):
+    return (await session.execute(select(User).filter_by(id=user_id).options(selectinload(User.chats)))).scalar_one_or_none()
 
 
 async def create_user(email: EmailStr, session: AsyncSession):
@@ -39,6 +44,9 @@ async def edit_user(data: EditUserScheme, session: AsyncSession):
         await session.commit()
         return user
     raise HTTPException(404, 'user is not found')
+
+
+
 
 
 

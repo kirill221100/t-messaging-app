@@ -1,11 +1,13 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
 
 
 class UserResponseScheme(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    username: str
-    name: str
+    username: Optional[str] = None
+    name: Optional[str] = None
     surname: Optional[str] = None
     email: EmailStr
 
