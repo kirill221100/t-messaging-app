@@ -1,6 +1,6 @@
 aioboto3==12.3.0
 aiobotocore==2.11.2
-git+ssh://git@github.com:kirill221100/aioEasyPillow.git#egg=aioeasypillow
+-e git+https://github.com/kirill221100/aioEasyPillow.git#egg=aioeasypillow
 aiofiles==23.2.1
 aiohttp==3.9.3
 aioitertools==0.11.0
