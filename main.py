@@ -33,13 +33,5 @@ app.include_router(chat_router, prefix='/chat', tags=['chat'])
 app.include_router(message_router, prefix='/message', tags=['message'])
 
 
-# @app.on_event('startup')
-# async def on_startup():
-#     await init_db()
-#     await redis.create_connections()
-#     yield
-#     await redis.delete_connections()
-
-
 if __name__ == '__main__':
-    uvicorn.run('main:app', reload=True)
+    uvicorn.run('main:app', reload=False)

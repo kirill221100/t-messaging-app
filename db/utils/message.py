@@ -1,10 +1,10 @@
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from db.utils.user import get_user_by_id
 from schemes.message import MessageScheme
 from db.models.message import Message, MessageTypes
-from db.utils.chat import get_chat_by_id, check_if_user_in_chat
+from db.utils.chat import check_if_user_in_chat
+from utils.aws import upload_photos, upload_videos
 from fastapi import HTTPException
 
 
@@ -31,13 +31,17 @@ async def get_messages_by_chat_id(chat_id: int, user_id: int, session: AsyncSess
 async def create_message(message_data: MessageScheme, session: AsyncSession):
     if chat := await check_if_user_in_chat(message_data.chat_id, message_data.user_id, session):
         message = Message(type=MessageTypes.TEXT.value)
-        message.user_id = message_data.user_id
-        message.chat = chat
-        if reply_on := await get_message_by_id(message_data.reply_on_id, session):
-            message.reply_on = reply_on
         for k, v in message_data:
-            if k not in ['user', 'reply_on']:
+            if k not in ['reply_on', 'photos', 'videos']:
                 setattr(message, k, v)
         session.add(message)
+        await session.flush()
+        if message_data.photos:
+            message.photos = await upload_photos(message_data.photos, message_data.chat_id, message_data.user_id, message.id)
+        if message_data.videos:
+            message.videos = await upload_videos(message_data.videos, message_data.chat_id, message_data.user_id, message.id)
+        if reply_on := await get_message_by_id(message_data.reply_on_id, session):
+            message.reply_on = reply_on
+        message.chat = chat
         await session.commit()
         return message

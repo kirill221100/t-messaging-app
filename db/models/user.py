@@ -1,7 +1,5 @@
-import datetime
 from db.db_setup import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey
 from typing import List
 from db.models.assotiations import chat_users_association_table
 

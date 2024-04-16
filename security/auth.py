@@ -1,5 +1,5 @@
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, Query, WebSocket, status, WebSocketException
+from fastapi import Depends, HTTPException, Query, WebSocket, status
 from security.jwt import verify_token, verify_token_ws
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auth/login-for-debug')

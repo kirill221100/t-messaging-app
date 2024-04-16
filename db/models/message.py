@@ -10,6 +10,8 @@ from sqlalchemy import ForeignKey
 
 class MessageTypes(Enum):
     TEXT = "TEXT"
+    PHOTO = "PHOTO"
+    VIDEO = "VIDEO"
     VOICE = "VOICE"
     STICKER = "STICKER"
 
@@ -18,7 +20,7 @@ class Message(Base):
     __tablename__ = 'messages'
     id: Mapped[int] = mapped_column(primary_key=True)
     text: Mapped[str] = mapped_column(Text)
-    pictures: Mapped[List[str]] = mapped_column(ARRAY(String), server_default='{}', nullable=True)  # <= 10
+    photos: Mapped[List[str]] = mapped_column(ARRAY(String), server_default='{}', nullable=True)  # <= 10
     videos: Mapped[List[str]] = mapped_column(ARRAY(String), server_default='{}', nullable=True)  # <= 10
     user: Mapped["User"] = relationship(back_populates='messages')
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))

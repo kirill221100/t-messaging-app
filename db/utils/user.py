@@ -2,10 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from db.models.user import User
-from schemes.auth import RegisterScheme
 from schemes.user import EditUserScheme
 from fastapi import HTTPException
-from security.password import hash_password
 from pydantic import EmailStr
 
 
@@ -26,8 +24,6 @@ async def get_user_by_id_with_chats(user_id: int, session: AsyncSession):
 
 
 async def create_user(email: EmailStr, session: AsyncSession):
-    # if await get_user_by_username(user_data.username, session):
-    #     raise HTTPException(status_code=409, detail='username already registered')
     if await get_user_by_email(email, session):
         raise HTTPException(status_code=409, detail='email already registered')
     user = User(email=email)

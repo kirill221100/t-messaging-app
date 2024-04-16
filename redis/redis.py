@@ -5,8 +5,8 @@ import logging
 from typing import List, Dict
 import aioredis
 from fastapi import WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 from config import config
-from schemes.message import MessageScheme
 
 
 class Redis:
@@ -37,95 +37,6 @@ class Redis:
 
 
 redis = Redis()
-
-
-# class MessageManager:
-#     def __init__(self):
-#         self.active_connections: Dict[str, List[WebSocket]] = {}
-#         self.users_websockets: Dict[int, WebSocket] = {}
-#
-#     async def connect(self, ws: WebSocket, user_id: int, channel: str):
-#         await ws.accept()
-#         self.users_websockets[user_id] = ws
-#         if room := self.active_connections.get(channel):
-#             room.append(ws)
-#         else:
-#             self.active_connections[channel] = [ws]
-#             subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
-#             waiting_task = asyncio.create_task(asyncio.sleep(1))
-#             await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task], return_when=asyncio.FIRST_COMPLETED)
-#
-#     async def connect_to_new_chat(self, users_ids: List[int], channel: str):
-#         room = []
-#         for user_id in users_ids:
-#             if ws := self.users_websockets.get(user_id):
-#                 room.append(ws)
-#         self.active_connections[channel] = room
-#         subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
-#         waiting_task = asyncio.create_task(asyncio.sleep(1))
-#         await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task], return_when=asyncio.FIRST_COMPLETED)
-#
-#     async def connect_for_notifications(self, ws: WebSocket, user_id: int, channels: List[str]):
-#         await ws.accept()
-#         self.users_websockets[user_id] = ws
-#         for channel in channels:
-#             if room := self.active_connections.get(channel):
-#                 room.append(ws)
-#             else:
-#                 self.active_connections[channel] = [ws]
-#         subscribe_and_listen_to_channel_task = asyncio.create_task(
-#             self._subscribe_and_listen_to_channels_for_notifications(channels))
-#         await asyncio.wait([subscribe_and_listen_to_channel_task])
-#
-#     async def disconnect(self, ws: WebSocket, channel: str):
-#         if room := self.active_connections.get(channel):
-#             room.remove(ws)
-#
-#     async def disconnect_from_many(self, ws: WebSocket, channels: List[str], user_id: int):
-#         del self.users_websockets[user_id]
-#         for channel in channels:
-#             if room := self.active_connections.get(channel):
-#                 room.remove(ws)
-#
-#     async def _subscribe_and_listen_to_channels_for_notifications(self, channels: List[str]):
-#         await redis.subscribe_on_many(channels)
-#         async for msg in redis.psub.listen():
-#             await self._consume_events_notifications(msg['channel'].decode('utf-8'), msg)
-#
-#     async def _subscribe_and_listen_to_channel(self, channel: str):
-#         await redis.subscribe(channel)
-#         async for msg in redis.psub.listen():
-#             logging.warning(msg)
-#             await self._consume_events(channel, msg)
-#
-#     async def _consume_events(self, channel, message):
-#         if room_connections := self.active_connections.get(channel):
-#             message['channel'] = message['channel'].decode('utf-8')
-#             try:
-#                 message['data'] = message['data'].decode('utf-8')
-#             except AttributeError:
-#                 pass
-#             for connection in room_connections:
-#                 try:
-#                     await connection.send_json(message)
-#                 except (WebSocketDisconnect, RuntimeError) as e:
-#                     await self.disconnect(connection, channel)
-#
-#     async def _consume_events_notifications(self, channel, message):
-#         if room_connections := self.active_connections.get(channel):
-#             message['channel'] = message['channel'].decode('utf-8')
-#             try:
-#                 message['data'] = message['data'].decode('utf-8')
-#             except AttributeError:
-#                 pass
-#             for connection in room_connections:
-#                 try:
-#                     await connection.send_json(message)
-#                 except (WebSocketDisconnect, RuntimeError) as e:
-#                     await self.disconnect_from_many(connection, channel, message['data']['user_id'].decode('utf-8'))
-#
-#     async def send_message_to_room(self, channel: str, message):
-#         await redis.publish(channel, json.dumps(message))
 
 
 class MessageManager:
@@ -183,15 +94,14 @@ class MessageManager:
     async def _consume_events(self, channel, message):
         if room_connections := self.active_connections.get(channel):
             message['channel'] = message['channel'].decode('utf-8')
-            try:
+            if message['type'] != 'subscribe':
                 message['data'] = message['data'].decode('utf-8')
-            except AttributeError:
-                pass
             for connection in room_connections:
                 try:
-                    await connection.send_json(message)
+                    if connection.application_state == WebSocketState.CONNECTED:
+                        await connection.send_json(message)
                 except (WebSocketDisconnect, RuntimeError) as e:
-                    await self.disconnect_from_many(connection, channel, message['data']['user_id'].decode('utf-8'))
+                    await self.disconnect_from_many(connection, channel, json.loads(message['data'])['user_id'])
 
     async def send_message_to_room(self, channel: str, message):
         await redis.publish(channel, json.dumps(message))

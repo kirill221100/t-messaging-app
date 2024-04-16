@@ -1,10 +1,7 @@
 import datetime
-
-from pydantic import BaseModel, conlist, ConfigDict, SkipValidation
-from typing import List, Annotated, Optional
-from annotated_types import Len
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 from db.models.chat import ChatTypes
-from schemes.message import MessageScheme
 from schemes.user import UserResponseScheme
 
 

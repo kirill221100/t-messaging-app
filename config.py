@@ -22,7 +22,12 @@ class Config(BaseSettings):
     REDIS_URL: str
     REDIS_USER: str
     REDIS_PASSWORD: str
-
+    AWS_ENDPOINT_URL: str
+    AWS_ACCESS_KEY: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_BUCKET: str
+    MAX_PHOTO_SIZE_MB: int
+    MAX_VIDEO_SIZE_MB: int
     model_config = SettingsConfigDict(env_file='.env')
 
 

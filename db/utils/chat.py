@@ -1,13 +1,14 @@
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import MultipleResultsFound
-from sqlalchemy.orm import selectinload, joinedload, lazyload, subqueryload, aliased, contains_eager
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from db.models.chat import Chat, ChatTypes
 from db.models.message import Message
-from db.models.user import User
-from schemes.chat import GroupChatScheme, DirectChatScheme, GroupChatResponseScheme
+from schemes.chat import GroupChatScheme, DirectChatScheme
 from db.utils.user import get_user_by_id
+
+
 async def get_chat_by_id_with_users(chat_id: int, session: AsyncSession):
     return (await session.execute(select(Chat)
                                   .filter_by(id=chat_id)
