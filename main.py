@@ -34,4 +34,4 @@ app.include_router(message_router, prefix='/message', tags=['message'])
 
 
 if __name__ == '__main__':
-    uvicorn.run('main:app', reload=False)
+    uvicorn.run('main:app', reload=False, ws_ping_interval=600, ws_ping_timeout=60)
