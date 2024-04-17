@@ -1,6 +1,6 @@
 from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.utils.user import get_user_by_id_with_chats
+from db.utils.user import get_user_by_id_with_chats, update_online_no_commit
 from redis.redis import message_manager
 from schemes.message import MessageScheme, MessageResponseScheme
 from schemes.user import UserResponseScheme
@@ -25,7 +25,7 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                 json_message = jsonable_encoder(MessageResponseScheme.from_orm(message))
                 await message_manager.send_message_to_room("chat_" + str(message.chat_id), json_message)
         except (WebSocketDisconnect, RuntimeError) as e:
-            await message_manager.disconnect_from_many(ws, channels, user_id)
+            await message_manager.disconnect_from_many(ws, channels, user_id) #other user m ay be disconncted and this user because of that now is also disconnected
 
 
 async def create_group_chat_func(chat_data: GroupChatScheme, token: dict, session: AsyncSession):

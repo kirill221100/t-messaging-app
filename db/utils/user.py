@@ -3,8 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from db.models.user import User
 from schemes.user import EditUserScheme
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
+from db.db_setup import get_session
 from pydantic import EmailStr
+import datetime
+from security.auth import get_current_user, get_current_user_ws
 
 
 async def get_user_by_username(username: str, session: AsyncSession):
@@ -30,6 +33,26 @@ async def create_user(email: EmailStr, session: AsyncSession):
     session.add(user)
     await session.commit()
     return user.id
+
+
+async def update_online_and_get_session(token=Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+    user = await get_user_by_id(token['user_id'], session)
+    user.last_time_online = datetime.datetime.utcnow()
+    await session.commit()
+    return session
+
+
+async def update_online_and_get_session_ws(token=Depends(get_current_user_ws),
+                                           session: AsyncSession = Depends(get_session)):
+    user = await get_user_by_id(token['user_id'], session)
+    user.last_time_online = datetime.datetime.utcnow()
+    await session.commit()
+    return session
+
+
+async def update_online_no_commit(user_id: int, session: AsyncSession):
+    user = await get_user_by_id(user_id, session)
+    user.last_time_online = datetime.datetime.utcnow()
 
 
 async def edit_user(data: EditUserScheme, session: AsyncSession):

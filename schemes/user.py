@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
 
@@ -10,6 +12,7 @@ class UserResponseScheme(BaseModel):
     name: Optional[str] = None
     surname: Optional[str] = None
     email: EmailStr
+    last_time_online: datetime.datetime
 
 
 class EditUserScheme(BaseModel):

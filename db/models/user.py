@@ -15,4 +15,4 @@ class User(Base):
     email: Mapped[str] = mapped_column()
     chats: Mapped[List["Chat"]] = relationship(back_populates='users', secondary=chat_users_association_table)
     messages: Mapped[List["Message"]] = relationship(back_populates='user')
-    #last_time_online: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    last_time_online: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from schemes.message import MessageScheme
 from db.models.message import Message, MessageTypes
+from db.utils.user import update_online_no_commit
 from db.utils.chat import check_if_user_in_chat
 from utils.aws import upload_photos, upload_videos
 from fastapi import HTTPException
@@ -43,5 +44,6 @@ async def create_message(message_data: MessageScheme, session: AsyncSession):
         if reply_on := await get_message_by_id(message_data.reply_on_id, session):
             message.reply_on = reply_on
         message.chat = chat
+        await update_online_no_commit(message_data.user_id, session)
         await session.commit()
         return message
