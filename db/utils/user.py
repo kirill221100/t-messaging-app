@@ -58,7 +58,7 @@ async def update_online_no_commit(user_id: int, session: AsyncSession):
 async def edit_user(data: EditUserScheme, session: AsyncSession):
     if user := await get_user_by_id(data.id, session):
         for k, v in data:
-            if k != 'id':
+            if k != 'message_id':
                 setattr(user, k, v)
         await session.commit()
         return user

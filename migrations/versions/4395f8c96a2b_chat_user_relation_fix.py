@@ -23,8 +23,8 @@ def upgrade() -> None:
     op.create_table('chat_users_association_table',
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('chat_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['chat_id'], ['chats.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['chat_id'], ['chats.message_id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.message_id'], ),
     sa.PrimaryKeyConstraint('user_id', 'chat_id')
     )
     # ### end Alembic commands ###

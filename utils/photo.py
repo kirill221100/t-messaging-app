@@ -6,7 +6,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 async def compress_photo(photo: bytes):
-    async with BytesIO(photo) as p:
+    with BytesIO(photo) as p:
         pic = BytesIO()
         await Editor(p).save(pic, format='JPEG', quality=75, optimize=True)
         return pic
