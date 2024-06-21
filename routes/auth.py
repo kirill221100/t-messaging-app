@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from schemes.auth import RegisterScheme, LoginEmailResponseScheme
 from schemes.user import UserResponseScheme
+from utils.auth import email_reg_send_func
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.db_setup import get_session
 from db.utils.user import create_user, get_user_by_email, get_user_by_id, reg_edit_user
@@ -14,25 +15,23 @@ from config import config
 auth_router = APIRouter()
 
 
-@auth_router.post('/registration', response_model=UserResponseScheme)
-async def registration_path(reg_data: RegisterScheme, session: AsyncSession = Depends(get_session)):
-    user = await reg_edit_user(reg_data, session)
-    return user
+# @auth_router.post('/registration', response_model=UserResponseScheme)
+# async def registration_path(reg_data: RegisterScheme, session: AsyncSession = Depends(get_session)):
+#     user = await reg_edit_user(reg_data, session)
+#     return user
 
 
-@auth_router.post('/email-reg-send/{email}')
-async def email_reg_send_path(email: EmailStr, back_tasks: BackgroundTasks,
+@auth_router.post('/email-reg-send')
+async def email_reg_send_path(reg_data: RegisterScheme, back_tasks: BackgroundTasks,
                               session: AsyncSession = Depends(get_session)):
-    user_id = await create_user(email, session)
-    verification_code = await create_email_code(user_id)
-    await send_email_verification(email, verification_code, back_tasks)
-    return {'id': user_id, 'msg': 'подтвердите почту, введя код присланный на email'}
+    return await email_reg_send_func(reg_data, back_tasks, session)
 
 
 @auth_router.get('/email-reg', response_model=LoginEmailResponseScheme)
-async def email_reg_path(user_id: int, code: int):
-    if await verify_email_code(user_id, code):
-        data = {'user_id': user_id}
+async def email_reg_path(email: EmailStr, code: int, session: AsyncSession = Depends(get_session)):
+    if ver := await verify_email_code(email, code):
+        user = await create_user(email, ver['username'], session)
+        data = {'user_id': user.id}
         return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
                 'token_type': 'bearer'}
     raise HTTPException(status_code=400, detail='incorrect code')

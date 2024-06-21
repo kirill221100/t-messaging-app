@@ -2,8 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from db.models.user import User
-from schemes.user import EditUserScheme
-from schemes.auth import RegisterScheme
+from schemes.user import EditUserScheme, CreateUserScheme
 from fastapi import HTTPException, Depends
 from db.db_setup import get_session
 from pydantic import EmailStr
@@ -34,13 +33,15 @@ async def get_users_by_ids_with_chats(ids: List[int], session: AsyncSession):
     return (await session.execute(select(User).filter(User.id.in_(ids)))).scalars().all()
 
 
-async def create_user(email: EmailStr, session: AsyncSession):
+async def create_user(email: EmailStr, username: str, session: AsyncSession):
     if await get_user_by_email(email, session):
         raise HTTPException(status_code=409, detail='email already registered')
-    user = User(email=email)
+    if await get_user_by_username(username, session):
+        raise HTTPException(status_code=409, detail='username already registered')
+    user = User(email=email, username=username)
     session.add(user)
     await session.commit()
-    return user.id
+    return user
 
 
 async def update_online_and_get_session(token=Depends(get_current_user), session: AsyncSession = Depends(get_session)):
@@ -69,7 +70,7 @@ async def update_online(user_id: int, session: AsyncSession):
     await session.commit()
 
 
-async def reg_edit_user(data: RegisterScheme, session: AsyncSession):
+async def reg_edit_user(data, session: AsyncSession):
     if user := await get_user_by_id(data.id, session):
         for k, v in data:
             if v is not None and k != 'id':

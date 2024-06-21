@@ -36,3 +36,8 @@ class InfoMessageUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     username: str
+
+
+class CreateUserScheme(BaseModel):
+    username: str
+    email: EmailStr

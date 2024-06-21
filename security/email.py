@@ -27,6 +27,8 @@ async def send_email_verification(email: EmailStr, code: str, back_tasks: Backgr
         recipients=[email],
         body=html,
         subtype=MessageType.html)
+    if config.DEBUG:
+        return await mail.send_message(message)
     back_tasks.add_task(mail.send_message, message)
     return True
 
