@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 app.include_router(auth_router, prefix='/auth', tags=['auth'])
-app.include_router(user_router, prefix='/user', tags=['auth'])
+app.include_router(user_router, prefix='/user', tags=['user'])
 app.include_router(chat_router, prefix='/chat', tags=['chat'])
 app.include_router(message_router, prefix='/message', tags=['message'])
 

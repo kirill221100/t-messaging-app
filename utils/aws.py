@@ -5,7 +5,18 @@ from config import config
 from utils.photo import compress_photo
 from utils.video import compress_video
 from typing import List
-import base64
+import base64, uuid
+
+
+async def upload_avatar(avatar: bytes, user_id: int, user_or_chat: str):
+    session = aioboto3.Session(aws_access_key_id=config.AWS_ACCESS_KEY,
+                               aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY)
+    async with session.resource("s3", endpoint_url=config.AWS_ENDPOINT_URL) as s3:
+        pic = await compress_photo(base64.b64decode(avatar))
+        obj = await s3.Object(config.AWS_BUCKET, f'avatar/{user_or_chat}/{user_id}/{uuid.uuid4()}.jpg')
+        r = await obj.put(Body=pic.getvalue())
+        pic.close()
+        return f"https://ipfs.filebase.io/ipfs/{r['ResponseMetadata']['HTTPHeaders']['x-amz-meta-cid']}"
 
 
 async def upload_photos(photos: List[bytes], chat_id: int, user_id: int, message_id: int):

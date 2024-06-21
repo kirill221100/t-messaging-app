@@ -42,20 +42,8 @@ async def send_login_email(email: EmailStr, code: str, back_tasks: BackgroundTas
     return True
 
 
-async def send_change_password_email(email: EmailStr, url: str, back_tasks: BackgroundTasks):
-    html = f"""<a href={url}>Подтвердите изменение пароля</a>"""
-    message = MessageSchema(
-        subject="[T] Подтверждение изменения пароля",
-        recipients=[email],
-        body=html,
-        subtype=MessageType.html)
-
-    back_tasks.add_task(mail.send_message, message)
-    return True
-
-
-async def send_email_changing(new_email: EmailStr, url: str, back_tasks: BackgroundTasks):
-    html = f"""<a href={url}>Подтвердите изменение почты</a>"""
+async def send_email_changing(new_email: EmailStr, code: str, back_tasks: BackgroundTasks):
+    html = f"""{code}"""
     message = MessageSchema(
         subject="[T] Подтверждение изменения почты",
         recipients=[new_email],

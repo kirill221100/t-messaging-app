@@ -3,11 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from db.models.user import User
 from schemes.user import EditUserScheme
+from schemes.auth import RegisterScheme
 from fastapi import HTTPException, Depends
 from db.db_setup import get_session
 from pydantic import EmailStr
 import datetime
+from utils.aws import upload_avatar
 from security.auth import get_current_user, get_current_user_ws
+from typing import List
 
 
 async def get_user_by_username(username: str, session: AsyncSession):
@@ -23,7 +26,12 @@ async def get_user_by_id(user_id: int, session: AsyncSession):
 
 
 async def get_user_by_id_with_chats(user_id: int, session: AsyncSession):
-    return (await session.execute(select(User).filter_by(id=user_id).options(selectinload(User.chats)))).scalar_one_or_none()
+    return (await session.execute(select(User).filter_by(id=user_id)
+                                  .options(selectinload(User.chats)))).scalar_one_or_none()
+
+
+async def get_users_by_ids_with_chats(ids: List[int], session: AsyncSession):
+    return (await session.execute(select(User).filter(User.id.in_(ids)))).scalars().all()
 
 
 async def create_user(email: EmailStr, session: AsyncSession):
@@ -55,23 +63,36 @@ async def update_online_no_commit(user_id: int, session: AsyncSession):
     user.last_time_online = datetime.datetime.utcnow()
 
 
-async def edit_user(data: EditUserScheme, session: AsyncSession):
+async def update_online(user_id: int, session: AsyncSession):
+    user = await get_user_by_id(user_id, session)
+    user.last_time_online = datetime.datetime.utcnow()
+    await session.commit()
+
+
+async def reg_edit_user(data: RegisterScheme, session: AsyncSession):
     if user := await get_user_by_id(data.id, session):
         for k, v in data:
-            if k != 'message_id':
+            if v is not None and k != 'id':
                 setattr(user, k, v)
         await session.commit()
         return user
     raise HTTPException(404, 'user is not found')
 
 
+async def edit_profile(data: EditUserScheme, user_id: int, session: AsyncSession):
+    user = await get_user_by_id(user_id, session)
+    for k, v in data:
+        if v is not None and k not in ['avatar', 'email']:
+            setattr(user, k, v)
+    if data.avatar:
+        avatar = await upload_avatar(data.avatar, user_id, 'user')
+        user.avatar = avatar
+    await session.commit()
+    return user
 
 
+async def set_new_email(user_id: int, email: str, session: AsyncSession):
+    user = await get_user_by_id(user_id, session)
+    user.email = email
+    await session.commit()
 
-
-async def verify_email(user_id: int, session: AsyncSession):
-    if user := await get_user_by_id(user_id, session):
-        user.is_verified = True
-        await session.commit()
-        return {'msg': 'Success email validation'}
-    raise HTTPException(status_code=404, detail='no user with such username')

@@ -4,7 +4,7 @@ from schemes.auth import RegisterScheme, LoginEmailResponseScheme
 from schemes.user import UserResponseScheme
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.db_setup import get_session
-from db.utils.user import create_user, get_user_by_email, get_user_by_id, edit_user
+from db.utils.user import create_user, get_user_by_email, get_user_by_id, reg_edit_user
 from security.email import send_email_verification, send_login_email
 from security.jwt import create_access_token, create_refresh_token, verify_refresh_token
 from redis.redis import create_email_code, verify_email_code
@@ -16,7 +16,7 @@ auth_router = APIRouter()
 
 @auth_router.post('/registration', response_model=UserResponseScheme)
 async def registration_path(reg_data: RegisterScheme, session: AsyncSession = Depends(get_session)):
-    user = await edit_user(reg_data, session)
+    user = await reg_edit_user(reg_data, session)
     return user
 
 

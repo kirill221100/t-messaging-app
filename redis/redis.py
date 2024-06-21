@@ -58,7 +58,8 @@ class MessageManager:
             subscribe_and_listen_to_channel_task = asyncio.create_task(
                 self._subscribe_and_listen_to_channels(nonexistent_rooms))
             waiting_task = asyncio.create_task(asyncio.sleep(1))
-            await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task], return_when=asyncio.FIRST_COMPLETED)
+            await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task],
+                               return_when=asyncio.FIRST_COMPLETED)
 
     async def connect_to_new_chat(self, users_ids: List[int], channel: str):
         room = []
@@ -69,6 +70,45 @@ class MessageManager:
         subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
         waiting_task = asyncio.create_task(asyncio.sleep(1))
         await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task], return_when=asyncio.FIRST_COMPLETED)
+
+    # async def connect_added_users(self, users_ids: List[int], channel: str):
+    #     if not (room := self.active_connections.get(channel)):
+    #         room = []
+    #     logging.warning(room)
+    #     for user_id in users_ids:
+    #         if ws := self.users_websockets.get(user_id):
+    #             room.append(ws)
+    #     if not self.active_connections.get(channel):
+    #         self.active_connections[channel] = room
+    #         subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
+    #         waiting_task = asyncio.create_task(asyncio.sleep(1))
+    #         await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task],
+    #                            return_when=asyncio.FIRST_COMPLETED)
+    async def connect_added_user(self, user_id: int, channel: str):
+        if not (room := self.active_connections.get(channel)):
+            room = []
+        logging.warning(room)
+        if ws := self.users_websockets.get(user_id):
+            room.append(ws)
+        if not self.active_connections.get(channel):
+            self.active_connections[channel] = room
+            subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
+            waiting_task = asyncio.create_task(asyncio.sleep(1))
+            await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task],
+                               return_when=asyncio.FIRST_COMPLETED)
+
+    async def disconnect_deleted_user(self, user_id: int, channel: str):
+        if room := self.active_connections.get(channel):
+            if ws := self.users_websockets.get(user_id):
+                room.remove(ws)
+
+    async def connect_added_users(self, ids: List[int], channel: str):
+        for i in ids:
+            await self.connect_added_user(i, channel)
+
+    async def disconnect_deleted_users(self, ids: List[int], channel: str):
+        for i in ids:
+            await self.disconnect_deleted_user(i, channel)
 
     async def disconnect(self, ws: WebSocket, channel: str):
         if room := self.active_connections.get(channel):
@@ -104,7 +144,8 @@ class MessageManager:
                     await self.disconnect_from_many(connection, channel, json.loads(message['data'])['user_id'])
 
     async def send_message_to_room(self, channel: str, message):
-        await redis.publish(channel, json.dumps(message))
+        if message_manager.active_connections.get(channel):
+            await redis.publish(channel, json.dumps(message))
 
 
 message_manager = MessageManager()
@@ -116,7 +157,21 @@ async def create_email_code(user_id: int):
     return code
 
 
+async def create_email_change_code(user_id: int, email: str):
+    code = random.randint(100000, 999999)
+    await redis.connection.set(user_id, json.dumps({"code": code, "email": email}), ex=600)
+    return code
+
+
 async def verify_email_code(user_id: int, code: int):
     if res := await redis.connection.get(user_id):
         return str(res, encoding='utf-8') == str(code)
+    return False
+
+
+async def verify_email_change_code(user_id: int, code: int):
+    if res := await redis.connection.get(user_id):
+        print(res)
+        if json.loads(res)['code'] == code:
+            return json.loads(res)['email']
     return False
