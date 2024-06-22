@@ -4,6 +4,7 @@ from db.utils.user import edit_profile
 from redis.redis import create_email_change_code
 from security.email import send_email_changing
 from fastapi import BackgroundTasks
+from config import config
 
 
 async def edit_profile_func(data: EditUserScheme, user_id: int, session: AsyncSession, back_tasks: BackgroundTasks):
@@ -11,5 +12,7 @@ async def edit_profile_func(data: EditUserScheme, user_id: int, session: AsyncSe
     if data.email:
         verification_code = await create_email_change_code(user_id, data.email)
         await send_email_changing(data.email, verification_code, back_tasks)
-        return {'msg': 'подтвердите почту, введя код присланный на email'}
+        if config.DEBUG:
+            return {'code': verification_code, 'profile': profile}
+        return {'profile': profile, 'msg': 'подтвердите почту, введя код присланный на email'}
     return profile

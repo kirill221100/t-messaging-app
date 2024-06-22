@@ -28,7 +28,8 @@ async def send_email_verification(email: EmailStr, code: str, back_tasks: Backgr
         body=html,
         subtype=MessageType.html)
     if config.DEBUG:
-        return await mail.send_message(message)
+        await mail.send_message(message)
+        return True
     back_tasks.add_task(mail.send_message, message)
     return True
 
@@ -40,6 +41,9 @@ async def send_login_email(email: EmailStr, code: str, back_tasks: BackgroundTas
         recipients=[email],
         body=html,
         subtype=MessageType.html)
+    if config.DEBUG:
+        await mail.send_message(message)
+        return True
     back_tasks.add_task(mail.send_message, message)
     return True
 
@@ -51,6 +55,8 @@ async def send_email_changing(new_email: EmailStr, code: str, back_tasks: Backgr
         recipients=[new_email],
         body=html,
         subtype=MessageType.html)
-
+    if config.DEBUG:
+        await mail.send_message(message)
+        return True
     back_tasks.add_task(mail.send_message, message)
     return {'msg': 'Email change was sent'}

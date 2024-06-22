@@ -14,7 +14,7 @@ async def my_profile_path(token=Depends(get_current_user), session=Depends(updat
     return await get_user_by_id(token['user_id'], session)
 
 
-@user_router.put('/edit-profile', response_model=Union[UserResponseScheme, dict])
+@user_router.put('/edit-profile')
 async def edit_profile_path(edit_data: EditUserScheme, back_tasks: BackgroundTasks, token=Depends(get_current_user),
                             session=Depends(update_online_and_get_session)):
     return await edit_profile_func(edit_data, token['user_id'], session, back_tasks)

@@ -2,7 +2,7 @@ import asyncio
 import json
 import random
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 import aioredis
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -151,23 +151,21 @@ class MessageManager:
 message_manager = MessageManager()
 
 
-async def create_email_code(email: str, username: str):
+async def create_email_code(email: str, username: Optional[str] = None):
     code = random.randint(100000, 999999)
     await redis.connection.set(email, json.dumps({"code": code, "username": username}), ex=600)
     return code
 
 
-async def create_email_change_code(email: str, username: str):
+async def create_email_change_code(user_id: int, email: str):
     code = random.randint(100000, 999999)
-    await redis.connection.set(email, json.dumps({"code": code, "username": username}), ex=600)
+    await redis.connection.set(user_id, json.dumps({"code": code, 'email': email}), ex=600)
     return code
 
 
 async def verify_email_code(email: str, code: int):
     if res := await redis.connection.get(email):
-        print(res)
         res_json = json.loads(str(res, encoding='utf-8'))
-        print(res_json)
         if res_json['code'] == code:
             return res_json
     return False
@@ -175,7 +173,6 @@ async def verify_email_code(email: str, code: int):
 
 async def verify_email_change_code(user_id: int, code: int):
     if res := await redis.connection.get(user_id):
-        print(res)
         if json.loads(res)['code'] == code:
             return json.loads(res)['email']
     return False

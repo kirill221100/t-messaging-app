@@ -18,7 +18,35 @@ async def email_reg_send_func(reg_data: RegisterScheme, back_tasks: BackgroundTa
     if await get_user_by_username(reg_data.username, session):
         raise HTTPException(status_code=409, detail='username already registered')
     verification_code = await create_email_code(reg_data.email, reg_data.username)
-    print(await send_email_verification(reg_data.email, verification_code, back_tasks))
+    await send_email_verification(reg_data.email, verification_code, back_tasks)
     if config.DEBUG:
         return verification_code
     return {'msg': 'подтвердите почту, введя код присланный на email'}
+
+
+async def email_reg_func(email: EmailStr, code: int, session: AsyncSession):
+    if ver := await verify_email_code(email, code):
+        user = await create_user(email, ver['username'], session)
+        data = {'user_id': user.id}
+        return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
+                'token_type': 'bearer'}
+    raise HTTPException(status_code=400, detail='incorrect code')
+
+
+async def login_func(email: EmailStr, back_tasks: BackgroundTasks, session: AsyncSession):
+    if await get_user_by_email(email, session):
+        verification_code = await create_email_code(email)
+        await send_login_email(email, verification_code, back_tasks)
+        if config.DEBUG:
+            return verification_code
+        return {'msg': 'подтвердите вход, введя код присланный на email'}
+    raise HTTPException(404, 'no such user')
+
+
+async def email_login_func(email: EmailStr, code: int, session: AsyncSession):
+    if await verify_email_code(email, code):
+        user = await get_user_by_email(email, session)
+        data = {'user_id': user.id}
+        return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
+                'token_type': 'bearer'}
+    raise HTTPException(status_code=400, detail='incorrect code')
