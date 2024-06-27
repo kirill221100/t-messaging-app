@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -34,4 +36,4 @@ app.include_router(message_router, prefix='/message', tags=['message'])
 
 
 if __name__ == '__main__':
-    uvicorn.run('main:app', reload=False, ws_ping_interval=None)
+    uvicorn.run('main:app', reload=False, ws_ping_interval=None, loop=asyncio.get_event_loop())

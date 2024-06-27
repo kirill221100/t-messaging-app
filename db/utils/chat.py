@@ -21,7 +21,7 @@ async def get_chat_by_id_with_users(chat_id: int, session: AsyncSession):
                                   .options(selectinload(Chat.users)))).scalar_one_or_none()
 
 
-async def get_chat_by_id_for_route(chat_id: int, session: AsyncSession):
+async def get_chat_by_id_polymorphic_with_users(chat_id: int, session: AsyncSession):
     return (await session.execute(select(Chat)
                                   .filter_by(id=chat_id)
                                   .options(selectinload(Chat.users),

@@ -17,6 +17,10 @@ async def test_registration(ac: AsyncClient):
     assert req3.status_code == 409
     req4 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="2@example.com", username='1').dict())
     assert req4.status_code == 409
+    req1 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="2@example.com", username='2').dict())
+    assert req1.status_code == 200
+    req2 = await ac.get(f'/auth/email-reg', params={'email': "2@example.com", 'code': req1.json()})
+    assert req2.status_code == 200
 
 
 @pytest.mark.anyio

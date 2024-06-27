@@ -1,7 +1,7 @@
 from httpx import AsyncClient
 import pytest
 from schemes.user import EditUserScheme
-import aiofiles, base64, json
+import aiofiles, base64
 
 tokens = {}
 

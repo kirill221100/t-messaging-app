@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 class GroupChatScheme(BaseModel):
     users_ids: List[int]
-    avatar: Optional[bytes] = None
+    avatar: Optional[str] = None
     name: str
 
 

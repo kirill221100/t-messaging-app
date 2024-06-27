@@ -4,7 +4,7 @@ from security.auth import get_current_user_ws, get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models.chat import ChatTypes
 from db.db_setup import get_session
-from db.utils.chat import delete_chat_history_for_user, get_chat_by_id_for_route
+from db.utils.chat import delete_chat_history_for_user, get_chat_by_id_polymorphic_with_users
 from db.utils.user import update_online_and_get_session, update_online_and_get_session_ws
 from utils.chat import connect_func, create_group_chat_func, create_direct_chat_func, get_users_chats_func, \
     edit_group_chat_func, block_direct_chat_func, unblock_direct_chat_func, read_messages_func, leave_group_chat_func, \
@@ -23,9 +23,8 @@ async def connect_path(ws: WebSocket, session: AsyncSession = Depends(update_onl
 
 @chat_router.get('/get-chat/{chat_id}', response_model=Union[GroupChatResponseSchemeWithUsers, DirectChatResponseScheme])
 async def get_chat_path(chat_id: int, session: AsyncSession = Depends(get_session)):
-    chat = await get_chat_by_id_for_route(chat_id, session)
+    chat = await get_chat_by_id_polymorphic_with_users(chat_id, session)
     if chat.type == ChatTypes.GROUP.value:
-        print(1212)
         return GroupChatResponseSchemeWithUsers.from_orm(chat)
     elif chat.type == ChatTypes.DIRECT.value:
         return DirectChatResponseScheme.from_orm(chat)

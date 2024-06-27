@@ -18,9 +18,9 @@ async def email_reg_send_func(reg_data: RegisterScheme, back_tasks: BackgroundTa
     if await get_user_by_username(reg_data.username, session):
         raise HTTPException(status_code=409, detail='username already registered')
     verification_code = await create_email_code(reg_data.email, reg_data.username)
-    await send_email_verification(reg_data.email, verification_code, back_tasks)
     if config.DEBUG:
         return verification_code
+    await send_email_verification(reg_data.email, verification_code, back_tasks)
     return {'msg': 'подтвердите почту, введя код присланный на email'}
 
 
@@ -36,9 +36,9 @@ async def email_reg_func(email: EmailStr, code: int, session: AsyncSession):
 async def login_func(email: EmailStr, back_tasks: BackgroundTasks, session: AsyncSession):
     if await get_user_by_email(email, session):
         verification_code = await create_email_code(email)
-        await send_login_email(email, verification_code, back_tasks)
         if config.DEBUG:
             return verification_code
+        await send_login_email(email, verification_code, back_tasks)
         return {'msg': 'подтвердите вход, введя код присланный на email'}
     raise HTTPException(404, 'no such user')
 

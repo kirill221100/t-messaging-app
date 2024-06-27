@@ -79,7 +79,8 @@ async def create_group_chat_func(chat_data: GroupChatScheme, token: dict, sessio
 
     users_ids = [user.id for user in chat.users]
     await message_manager.connect_to_new_chat(users_ids, f"chat_{chat.id}")
-    message = await create_info_message(user_id=token['user_id'], chat_id=chat.id,
+    user = await get_user_by_id(token['user_id'], session)
+    message = await create_info_message(user=user, chat_id=chat.id,
                                         info_type=InfoMessageTypes.NEW_CHAT.value, session=session)
     await session.commit()
     json_message = jsonable_encoder(InfoMessageResponseScheme.from_orm(message))

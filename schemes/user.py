@@ -2,6 +2,7 @@ import datetime
 from config import config
 from pydantic import BaseModel, EmailStr, ConfigDict, model_validator
 from typing import Optional
+from typing_extensions import TypedDict, NotRequired
 
 
 class UserResponseScheme(BaseModel):
@@ -41,3 +42,9 @@ class InfoMessageUser(BaseModel):
 class CreateUserScheme(BaseModel):
     username: str
     email: EmailStr
+
+
+class EditProfileResponseScheme(TypedDict):
+    profile: UserResponseScheme
+    code: NotRequired[int]
+    msg: NotRequired[str]

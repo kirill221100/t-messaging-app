@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from security.auth import get_current_user
 from db.utils.user import get_user_by_id, update_online_and_get_session, set_new_email
-from schemes.user import UserResponseScheme, EditUserScheme
+from schemes.user import UserResponseScheme, EditUserScheme, EditProfileResponseScheme
 from redis.redis import verify_email_change_code
 from utils.user import edit_profile_func
 from typing import Union
@@ -14,7 +14,7 @@ async def my_profile_path(token=Depends(get_current_user), session=Depends(updat
     return await get_user_by_id(token['user_id'], session)
 
 
-@user_router.put('/edit-profile')
+@user_router.put('/edit-profile', response_model=EditProfileResponseScheme)
 async def edit_profile_path(edit_data: EditUserScheme, back_tasks: BackgroundTasks, token=Depends(get_current_user),
                             session=Depends(update_online_and_get_session)):
     return await edit_profile_func(edit_data, token['user_id'], session, back_tasks)
