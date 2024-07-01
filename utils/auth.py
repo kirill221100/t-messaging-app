@@ -7,7 +7,7 @@ from db.db_setup import get_session
 from db.utils.user import create_user, get_user_by_email, get_user_by_id, reg_edit_user, get_user_by_username
 from security.email import send_email_verification, send_login_email
 from security.jwt import create_access_token, create_refresh_token, verify_refresh_token
-from redis.redis import create_email_code, verify_email_code
+from redis_utils.redis import create_email_code, verify_email_code
 from pydantic import EmailStr
 from config import config
 

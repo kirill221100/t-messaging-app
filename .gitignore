@@ -1,4 +1,4 @@
-/redis/redis.conf
+/redis_utils/redis.conf
 .env
 .env_prod
-/redis/data/
+/redis_utils/data/

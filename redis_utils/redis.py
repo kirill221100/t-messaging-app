@@ -3,6 +3,7 @@ import json
 import random
 import logging
 from typing import List, Dict, Optional
+#from redis import asyncio as aioredis
 import aioredis
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -20,8 +21,9 @@ class Redis:
         self.psub = self.connection.pubsub()
 
     async def delete_connections(self) -> None:
-        await self.connection.close()
-        await self.psub.close()
+        await self.connection.aclose()
+        await self.psub.aclose()
+
 
     async def subscribe(self, channel: str) -> None:
         await self.psub.subscribe(channel)
@@ -42,12 +44,17 @@ redis = Redis()
 class MessageManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
-        self.users_websockets: Dict[int, WebSocket] = {}
+        self.users_websockets: Dict[int, List[WebSocket]] = {}
 
     async def connect(self, ws: WebSocket, user_id: int, channels: List[str]):
         await ws.accept()
         nonexistent_rooms = []
-        self.users_websockets[user_id] = ws
+        if ws_list := self.users_websockets.get(user_id):
+            if ws not in ws_list:
+                self.users_websockets[user_id].append(ws)
+        else:
+            self.users_websockets[user_id] = [ws]
+        print(user_id, channels, self.active_connections, 22222)
         for channel in channels:
             if room := self.active_connections.get(channel):
                 room.append(ws)
@@ -64,9 +71,10 @@ class MessageManager:
     async def connect_to_new_chat(self, users_ids: List[int], channel: str):
         room = []
         for user_id in users_ids:
-            if ws := self.users_websockets.get(user_id):
+            if ws := self.users_websockets.get(user_id)[-1]:
                 room.append(ws)
         self.active_connections[channel] = room
+        print(channel, users_ids, self.active_connections, 1111)
         subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
         waiting_task = asyncio.create_task(asyncio.sleep(1))
         await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task], return_when=asyncio.FIRST_COMPLETED)
@@ -88,7 +96,7 @@ class MessageManager:
         if not (room := self.active_connections.get(channel)):
             room = []
         logging.warning(room)
-        if ws := self.users_websockets.get(user_id):
+        if ws := self.users_websockets.get(user_id)[-1]:
             room.append(ws)
         if not self.active_connections.get(channel):
             self.active_connections[channel] = room
@@ -99,8 +107,9 @@ class MessageManager:
 
     async def disconnect_deleted_user(self, user_id: int, channel: str):
         if room := self.active_connections.get(channel):
-            if ws := self.users_websockets.get(user_id):
-                room.remove(ws)
+            if ws_list := self.users_websockets.get(user_id):
+                for ws in ws_list:
+                    room.remove(ws)
 
     async def connect_added_users(self, ids: List[int], channel: str):
         for i in ids:
@@ -115,18 +124,27 @@ class MessageManager:
             room.remove(ws)
 
     async def disconnect_from_many(self, ws: WebSocket, channels: List[str], user_id: int):
-        del self.users_websockets[user_id]
+        #del self.users_websockets[user_id]
+        self.users_websockets[user_id].remove(ws)
         for channel in channels:
             if room := self.active_connections.get(channel):
                 room.remove(ws)
 
     async def _subscribe_and_listen_to_channels(self, channels: List[str]):
+        # for i in channels:
+        #     logging.warning([i, self.active_connections, 3333])
+        #     if i in self.active_connections:
+        #         return
         await redis.subscribe_on_many(channels)
         async for msg in redis.psub.listen():
             await self._consume_events(msg['channel'].decode('utf-8'), msg)
 
     async def _subscribe_and_listen_to_channel(self, channel: str):
+        logging.warning([channel, self.active_connections, 3333])
+        print(3333, channel, self.active_connections, 3333)
         await redis.subscribe(channel)
+        check2 = asyncio.all_tasks()
+        check3 = asyncio.get_running_loop()
         async for msg in redis.psub.listen():
             logging.warning(msg)
             await self._consume_events(channel, msg)
@@ -144,6 +162,10 @@ class MessageManager:
                     await self.disconnect_from_many(connection, channel, json.loads(message['data'])['user_id'])
 
     async def send_message_to_room(self, channel: str, message):
+        check = self.active_connections
+        check2 = asyncio.all_tasks()
+        check3 = asyncio.get_running_loop()
+        print(check)
         if message_manager.active_connections.get(channel):
             await redis.publish(channel, json.dumps(message))
 

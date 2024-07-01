@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from security.auth import get_current_user
 from db.utils.user import get_user_by_id, update_online_and_get_session, set_new_email
 from schemes.user import UserResponseScheme, EditUserScheme, EditProfileResponseScheme
-from redis.redis import verify_email_change_code
+from redis_utils.redis import verify_email_change_code
 from utils.user import edit_profile_func
 from typing import Union
 

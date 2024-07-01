@@ -1,10 +1,11 @@
+import asyncio
 import datetime
 import logging
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException, BackgroundTasks, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 from db.utils.user import get_user_by_id_with_chats, get_user_by_id
-from redis.redis import message_manager
+from redis_utils.redis import message_manager
 from schemes.message import WSMessageTypes, MessageResponseScheme, WSMessageSchemeCreate, WSMessageSchemeEdit, \
     WSMessageSchemeDelete, InfoMessage, InfoMessageResponseScheme
 from schemes.user import UserResponseScheme
@@ -29,11 +30,13 @@ from typing import Optional
 
 async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
     if user_id := token['user_id']:
+        print(user_id)
         user = await get_user_by_id_with_chats(user_id, session)
         channels = [f"chat_{chat.id}" for chat in user.chats]
         await message_manager.connect(ws, user_id, channels)
         try:
             while True:
+                check3 = asyncio.get_running_loop()
                 message_json = await ws.receive_json()
                 #  create {'text'(optional): 'a',
                 #          'chat_id': 1,
@@ -67,6 +70,7 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                     except ValidationError as e:
                         raise WebSocketException(1007, e.errors()[0]['msg'])
                     data = {"ws_type": msg_type, "msg": json_message}
+                    check3 = asyncio.get_running_loop()
                     await message_manager.send_message_to_room(f"chat_{str(json_message['chat_id'])}", data)
                 else:
                     raise WebSocketException(1007, "There is no message type")
