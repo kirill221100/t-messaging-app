@@ -5,7 +5,6 @@ from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
-from sqlalchemy.ext.asyncio import AsyncSession
 import config_setup
 from fastapi.testclient import TestClient
 from asgi_lifespan import LifespanManager
