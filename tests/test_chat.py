@@ -7,8 +7,7 @@ from schemes.chat import GroupChatScheme, DirectChatScheme
 from schemes.message import WSMessageTypes
 from db.models.message import InfoMessageTypes, MessageTypes
 from httpx_ws import aconnect_ws
-
-tokens = []
+from tests.conftest import tokens
 
 
 async def second_user_ws(token, ac):
@@ -26,19 +25,14 @@ async def second_user_ws(token, ac):
 
 @pytest.mark.anyio
 async def test_creating_group_chats(ac: AsyncClient):
-    global tokens
-    req1 = await ac.post(f'/auth/login', params={'email': "1@example.com"})
-    req2 = await ac.get(f'/auth/email-login', params={'email': "1@example.com", 'code': req1.json()})
-    tokens.append(req2.json())
-    req1 = await ac.post(f'/auth/login', params={'email': "2@example.com"})
-    req2 = await ac.get(f'/auth/email-login', params={'email': "2@example.com", 'code': req1.json()})
-    tokens.append(req2.json())
-    task = asyncio.create_task(second_user_ws(tokens[1]["access_token"], ac))
-    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]["access_token"]}', ac) as ws:
+    #global tokens
+    print(tokens)
+    task = asyncio.create_task(second_user_ws(tokens[1], ac))
+    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         # async with aiofiles.open('test_files/test_pic.jpg', 'rb') as f:
         #     avatar = base64.b64encode(await f.read()).decode('utf-8')
         req1 = await ac.post(f'/chat/create-group-chat',
-                             headers={"Authorization": f'Bearer {tokens[0]["access_token"]}'},
+                             headers={"Authorization": f'Bearer {tokens[0]}'},
                              json=GroupChatScheme(users_ids=[2], name='1').dict())
         assert req1.status_code == 200
         while True:
@@ -50,26 +44,21 @@ async def test_creating_group_chats(ac: AsyncClient):
                     assert res['msg']['info_type'] == InfoMessageTypes.NEW_CHAT.value
                     break
         await ws.close()
-        tokens = []
+
+
 @pytest.mark.anyio
 async def test_creating_direct_chats(ac: AsyncClient):
-    global tokens
-    req1 = await ac.post(f'/auth/login', params={'email': "1@example.com"})
-    req2 = await ac.get(f'/auth/email-login', params={'email': "1@example.com", 'code': req1.json()})
-    tokens.append(req2.json())
-    req1 = await ac.post(f'/auth/login', params={'email': "2@example.com"})
-    req2 = await ac.get(f'/auth/email-login', params={'email': "2@example.com", 'code': req1.json()})
-    tokens.append(req2.json())
-    task1 = asyncio.create_task(second_user_ws(tokens[1]["access_token"], ac))
+    #global tokens
+    task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
     #task2 = asyncio.create_task(second_user_ws(tokens[1]["access_token"], ac))
-    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]["access_token"]}', ac) as ws:
+    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         req1 = await ac.post(f'/chat/create-direct-chat',
-                             headers={"Authorization": f'Bearer {tokens[0]["access_token"]}'},
+                             headers={"Authorization": f'Bearer {tokens[0]}'},
                              json=DirectChatScheme(user_id=2).dict())
         assert req1.status_code == 200
 
 
-        req = await ws.send_json({"text": "hi", "chat_id": 2,  "message_type": WSMessageTypes.CREATE_MESSAGE.value})
+        req = await ws.send_json({"text": "hi", "chat_id": 3,  "message_type": WSMessageTypes.CREATE_MESSAGE.value})
         # # await asyncio.sleep(2)
         #res1 = await task1
         # res2 = await task2

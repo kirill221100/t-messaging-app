@@ -154,7 +154,7 @@ async def create_direct_chat(chat_data: DirectChatScheme, creator_id: int, sessi
         chat.users.extend([user1, user2])
         await session.commit()
         return chat
-    raise HTTPException(400, 'Such direct chat already exists')
+    raise HTTPException(409, 'Such direct chat already exists')
 
 
 async def create_left_chat(chat: GroupChat, user_id: int, session: AsyncSession):
