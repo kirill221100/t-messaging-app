@@ -21,19 +21,24 @@ async def test_edit_profile(ac: AsyncClient):
     req1 = await ac.put(f'/user/edit-profile', headers={"Authorization": f'Bearer {tokens[0]}'},
                         json=EditUserScheme(username=username, email=email, avatar=avatar, description=description).dict())
     assert req1.status_code == 200
+
     profile = req1.json()['profile']
     code = req1.json()['code']
     assert profile['username'] == username
-    assert profile['avatar'] != None
+    assert profile['avatar'] is not None
     assert profile['description'] == description
     req2 = await ac.get(f'/user/email-change', headers={"Authorization": f'Bearer {tokens[0]}'},
                         params={'code': code})
     assert req2.status_code == 200
+
     user = await ac.get(f'/user/my-profile', headers={"Authorization": f'Bearer {tokens[0]}'})
     assert user.json()['email'] == email
     req1 = await ac.put(f'/user/edit-profile', headers={"Authorization": f'Bearer {tokens[0]}'},
                         json=EditUserScheme(username=username).dict())
     assert req1.status_code == 409
+    assert req1.json()['detail'] == "Username already exists"
+
     req2 = await ac.get(f'/user/email-change', headers={"Authorization": f'Bearer {tokens[0]}'},
                         params={'code': 2323232323323})
     assert req2.status_code == 400
+    assert req2.json()['detail'] == "Incorrect code"

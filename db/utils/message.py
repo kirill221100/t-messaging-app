@@ -1,15 +1,16 @@
+import asyncio
 import datetime
 from sqlalchemy import select, desc, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, selectin_polymorphic
-from schemes.message import WSMessageSchemeEdit, WSMessageSchemeCreate, WSMessageSchemeDelete, \
-    InfoMessage as InfoMessageScheme
+from sqlalchemy.orm.attributes import flag_modified
+from schemes.message import WSMessageSchemeEdit, WSMessageSchemeCreate, WSMessageSchemeDelete
 from db.models.message import Message, DefaultMessage, InfoMessage, MessageTypes, InfoMessageTypes
 from db.models.chat import DeletedHistory, AddedDeletedUserHistory, ReadDate, LeftGroupChat
 from db.models.user import User
 from schemes.chat import ChatTypes
 from db.utils.user import update_online
-from utils.aws import upload_photos, upload_videos, replace_photo, replace_video
+from utils.aws import upload_photos, upload_videos, upload_photo, upload_video
 from fastapi import HTTPException, WebSocketException
 from config import config
 from typing import Optional, List
@@ -52,7 +53,6 @@ async def make_query_without_deleted_history(history_query_str: str, ad_history:
         history_query_str = f"messages.date >= '{ad_history.added_dates[0]}'"
     else:
         for i in range(len(ad_history.added_dates[:-1])):
-            print(i, ad_history.deleted_dates[i], ad_history.added_dates[i])
             history_query_str += f"(messages.date >= '{ad_history.added_dates[i]}' " \
                                  f"AND messages.date <= '{ad_history.deleted_dates[i]}') OR "
         history_query_str += f" (messages.date >= '{ad_history.added_dates[-1]}')"
@@ -76,7 +76,6 @@ async def get_messages_by_chat_id(chat_id: int, session: AsyncSession, deleted_h
         history_query_str += f") AND (messages.date < '{left_chat.leave_dates[-1]}' OR messages.date > '{left_chat.return_dates[-1]}'))"
     else:
         history_query_str += ')'
-    print(history_query_str)
     if last_message_id:
         return (await session.execute(select(Message)
                                       .options(selectin_polymorphic(Message, [DefaultMessage, InfoMessage]),
@@ -95,16 +94,16 @@ async def get_messages_by_chat_id(chat_id: int, session: AsyncSession, deleted_h
 async def create_message(message_data: WSMessageSchemeCreate, session: AsyncSession):
     message = DefaultMessage(type=MessageTypes.DEFAULT.value)
     for k, v in message_data:
-        if k not in ['reply_on', 'photos', 'videos']:
+        if k not in ['reply_on_id']:
             setattr(message, k, v)
     session.add(message)
     await session.flush()
-    if message_data.photos:
-        message.photos = await upload_photos(message_data.photos, message_data.chat_id,
-                                             message_data.user_id, message.id)
-    if message_data.videos:
-        message.videos = await upload_videos(message_data.videos, message_data.chat_id,
-                                             message_data.user_id, message.id)
+    # if message_data.photos:
+    #     message.photos = await upload_photos(message_data.photos, message_data.chat_id,
+    #                                          message_data.user_id, message.id)
+    # if message_data.videos:
+    #     message.videos = await upload_videos(message_data.videos, message_data.chat_id,
+    #                                          message_data.user_id, message.id)
     if reply_on := await get_message_by_id(message_data.reply_on_id, session):
         message.reply_on = reply_on
     message.chat_id = message_data.chat_id
@@ -129,12 +128,12 @@ def edit_or_delete_message_check(f):
     async def wrapper(message_data: WSMessageSchemeEdit, session: AsyncSession):
         if message := await get_default_message_by_id(message_data.message_id, session):
             if message.date + datetime.timedelta(
-                    minutes=config.EDIT_MESSAGE_INTERVAL_MINUTES) > datetime.datetime.utcnow():
+                    minutes=config.EDIT_MESSAGE_INTERVAL_MINUTES) >= datetime.datetime.utcnow():
                 if message.user_id == message_data.user_id:
                     return await f(message_data, message, session)
                 raise WebSocketException(1008, "You are not an author of this message")
             raise WebSocketException(1008, f"{config.EDIT_MESSAGE_INTERVAL_MINUTES} minutes have already passed")
-        raise WebSocketException(1007, "There is no default message with such id")
+        raise WebSocketException(1007, "There is no message with such id")
 
     return wrapper
 
@@ -146,20 +145,24 @@ async def edit_message(message_data: WSMessageSchemeEdit, message: Message, sess
             setattr(message, k, v)
     if message_data.photo:
         if len(message.photos) >= (photo_index := int(list(message_data.photo.keys())[0])) + 1:
-            message.photos[photo_index] = await replace_photo(message_data.photo[photo_index],
-                                                              photo_index,
-                                                              message_data.chat_id,
-                                                              message_data.user_id,
-                                                              message.id)
+            # message.photos[photo_index] = await replace_photo(message_data.photo[photo_index],
+            #                                                   photo_index,
+            #                                                   message_data.chat_id,
+            #                                                   message_data.user_id,
+            #                                                   message.id)
+            #flag_modified(message, "photos")
+            message.photos[photo_index] = message_data.photo[photo_index]
         else:
             raise WebSocketException(1007, "No photo with such index")
     if message_data.video:
         if len(message.videos) >= (video_index := int(list(message_data.video.keys())[0])) + 1:
-            message.videos[video_index] = await replace_video(message_data.video[video_index],
-                                                              video_index,
-                                                              message_data.chat_id,
-                                                              message_data.user_id,
-                                                              message.id)
+            # message.videos[video_index] = await replace_video(message_data.video[video_index],
+            #                                                   video_index,
+            #                                                   message_data.chat_id,
+            #                                                   message_data.user_id,
+            #                                                   message.id)
+            #flag_modified(message, "videos")
+            message.videos[video_index] = message_data.video[video_index]
         else:
             raise WebSocketException(1007, "No video with such index")
     message.last_time_edited = datetime.datetime.utcnow()

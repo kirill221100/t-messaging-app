@@ -24,6 +24,7 @@ class WSMessageTypes(Enum):
 def check_photos_size(photos: List[bytes]):
     max_size_photo = config.MAX_PHOTO_SIZE_MB * 1_000_000
     for photo in photos:
+        print(len(photo))
         assert len(photo) <= max_size_photo, f"Every photo must be less than {config.MAX_PHOTO_SIZE_MB} MB"
 
 
@@ -50,8 +51,8 @@ class WSMessageSchemeBase(MessageScheme):
 
 class WSMessageSchemeCreate(WSMessageSchemeBase):
     text: Optional[str] = None
-    photos: Optional[Annotated[list[bytes], Len(min_length=1, max_length=10)]] = None
-    videos: Optional[Annotated[list[bytes], Len(min_length=1, max_length=10)]] = None
+    photos: Optional[Annotated[list[str], Len(min_length=1, max_length=10)]] = None
+    videos: Optional[Annotated[list[str], Len(min_length=1, max_length=10)]] = None
     reply_on_id: Optional[int] = None
 
     @model_validator(mode='after')
@@ -59,7 +60,7 @@ class WSMessageSchemeCreate(WSMessageSchemeBase):
     def validate_given_values(cls, field_values):
         dict_values = dict(field_values)
         vals = list(map(lambda x: bool(dict_values[x]), dict_values))
-        assert vals.count(True) >= 2, "Nothing to edit has been given"
+        assert vals.count(True) >= 4, "Nothing to create has been given"
         return field_values
 
 
@@ -83,8 +84,8 @@ class WSMessageSchemeCreate(WSMessageSchemeBase):
 class WSMessageSchemeEdit(WSMessageSchemeBase):
     text: Optional[str] = None
     message_id: int
-    photo: Optional[Annotated[dict[int, bytes], Len(min_length=1, max_length=1)]] = None
-    video: Optional[Annotated[dict[int, bytes], Len(min_length=1, max_length=1)]] = None
+    photo: Optional[Annotated[dict[int, str], Len(min_length=1, max_length=1)]] = None
+    video: Optional[Annotated[dict[int, str], Len(min_length=1, max_length=1)]] = None
 
     @model_validator(mode='after')
     @classmethod

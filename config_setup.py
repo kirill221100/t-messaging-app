@@ -5,9 +5,10 @@ from functools import lru_cache
 class Config(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
+    POSTGRES_PORT: int
     POSTGRES_DB: str
-    POSTGRES_TEST_DB: str
     POSTGRES_HOST: str
+    POSTGRES_TEST_DB: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     REFRESH_TOKEN_EXPIRE_MINUTES: int
     EMAIL_TOKEN_EXPIRE_MINUTES: int
@@ -17,6 +18,7 @@ class Config(BaseSettings):
     JWT_EMAIL_SECRET_KEY: str
     ALGORITHM: str
     DEBUG: bool
+    VIDEO_PATH: str
     MAIL_SERVER: str
     MAIL_PORT: int
     MAIL_USERNAME: str

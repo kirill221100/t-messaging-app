@@ -4,7 +4,7 @@ services:
     build: .
     ports:
       - 80:80
-    command: bash -c "alembic upgrade head && gunicorn --workers=3 -b 0.0.0.0:80 -k uvicorn.workers.UvicornWorker main:app"
+    command: bash -c "gunicorn --workers=3 -b 0.0.0.0:80 -k uvicorn.workers.UvicornWorker main:app"
     environment:
       APP_NAME: "t_base"
     depends_on:
@@ -28,7 +28,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "54320:5432"
+      - "${POSTGRES_PORT}:5432"
   redis:
     image: redis:7
     container_name: redis

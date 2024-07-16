@@ -14,9 +14,9 @@ from config import config
 
 async def email_reg_send_func(reg_data: RegisterScheme, back_tasks: BackgroundTasks, session: AsyncSession):
     if await get_user_by_email(reg_data.email, session):
-        raise HTTPException(status_code=409, detail='email already registered')
+        raise HTTPException(status_code=409, detail='Email already registered')
     if await get_user_by_username(reg_data.username, session):
-        raise HTTPException(status_code=409, detail='username already registered')
+        raise HTTPException(status_code=409, detail='Username already registered')
     verification_code = await create_email_code(reg_data.email, reg_data.username)
     if config.DEBUG:
         return verification_code
@@ -30,7 +30,7 @@ async def email_reg_func(email: EmailStr, code: int, session: AsyncSession):
         data = {'user_id': user.id}
         return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
                 'token_type': 'bearer'}
-    raise HTTPException(status_code=400, detail='incorrect code')
+    raise HTTPException(status_code=400, detail='Incorrect code')
 
 
 async def login_func(email: EmailStr, back_tasks: BackgroundTasks, session: AsyncSession):
@@ -40,7 +40,7 @@ async def login_func(email: EmailStr, back_tasks: BackgroundTasks, session: Asyn
             return verification_code
         await send_login_email(email, verification_code, back_tasks)
         return {'msg': 'подтвердите вход, введя код присланный на email'}
-    raise HTTPException(404, 'no such user')
+    raise HTTPException(404, 'No such user')
 
 
 async def email_login_func(email: EmailStr, code: int, session: AsyncSession):
@@ -49,4 +49,4 @@ async def email_login_func(email: EmailStr, code: int, session: AsyncSession):
         data = {'user_id': user.id}
         return {'access_token': create_access_token(data), 'refresh_token': create_refresh_token(data),
                 'token_type': 'bearer'}
-    raise HTTPException(status_code=400, detail='incorrect code')
+    raise HTTPException(status_code=400, detail='Incorrect code')
