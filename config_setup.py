@@ -23,7 +23,6 @@ class Config(BaseSettings):
     MAIL_PORT: int
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
-    MAIL_TEST: str
     REDIS_URL: str
     REDIS_USER: str
     REDIS_PASSWORD: str
