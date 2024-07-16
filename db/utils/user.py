@@ -86,7 +86,7 @@ async def edit_profile(data: EditUserScheme, user_id: int, session: AsyncSession
         if v is not None and k not in ['avatar', 'email', 'username']:
             setattr(user, k, v)
     if data.username and await get_user_by_username(data.username, session):
-        raise HTTPException(409, "username already exists")
+        raise HTTPException(409, "Username already exists")
     elif data.username:
         user.username = data.username
     if data.avatar:

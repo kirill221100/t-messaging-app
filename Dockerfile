@@ -8,3 +8,4 @@ WORKDIR /app
 RUN pip install -r requirements.txt
 COPY . /app
 COPY .env_prod .env
+RUN chmod +x db-init-scripts/create-multiple-dbs.sh

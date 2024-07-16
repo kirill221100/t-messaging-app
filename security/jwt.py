@@ -46,9 +46,9 @@ def verify_refresh_token(token: str):
     try:
         if user_data := jwt.decode(token, config.JWT_REFRESH_SECRET_KEY, algorithms=[config.ALGORITHM]):
             return user_data
-        raise HTTPException(401, detail='empty refresh token', headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(401, detail='Empty refresh token', headers={"WWW-Authenticate": "Bearer"})
     except JWTError:
-        raise HTTPException(401, detail='invalid refresh token', headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(401, detail='Invalid refresh token', headers={"WWW-Authenticate": "Bearer"})
 
 
 def verify_email_token(token: str):

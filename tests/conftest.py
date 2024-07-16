@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import logging
 from pydantic_settings import SettingsConfigDict
 from typing import AsyncGenerator
 from httpx import AsyncClient
@@ -18,18 +19,27 @@ import fakeredis, types
 from db.models.user import User
 from security.jwt import create_access_token
 from db.models.chat import GroupChat, DirectChat, ChatTypes
-from db.models.message import Message, MessageTypes
+from db.models.message import DefaultMessage, MessageTypes
+
+
+
 
 test_engine = create_async_engine(
-    f"postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}@{config.POSTGRES_HOST}:5432/{config.POSTGRES_TEST_DB}",
+    f"postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_TEST_DB}",
     echo=False, poolclass=NullPool)
 test_session = async_sessionmaker(test_engine, expire_on_commit=False)
+logging.basicConfig()
+logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
 Base.metadata.bind = test_engine
 tokens = []
 
 async def override_get_session() -> AsyncGenerator[AsyncClient, None]:
     async with test_session() as session:
         yield session
+
+video_path = config.VIDEO_PATH
+config.VIDEO_PATH = f'../{video_path}'
+config.DEBUG = True
 
 
 app.dependency_overrides[get_session] = override_get_session
@@ -47,14 +57,25 @@ async def alt_fun(self) -> None:
 redis.create_connections = types.MethodType(alt_fun, redis)
 
 
-@pytest.fixture
-async def session() -> AsyncGenerator[AsyncClient, None]:
-    async with test_session() as session:
-        yield session
+
 
 
 @pytest.fixture(autouse=True, scope='session')
 async def ws_lifespan():
+    # res = []
+    # test_engine1 = create_async_engine(
+    #     f"postgresql+asyncpg://{config.POSTGRES_TEST_USER}:{config.POSTGRES_TEST_PASSWORD}@{config.POSTGRES_HOST}:{config.POSTGRES_TEST_PORT}/{config.POSTGRES_DB}",
+    #     echo=False, poolclass=NullPool)
+    # try:
+    #     async with test_engine1.begin() as conn:
+    #         pass
+    # except Exception as e:
+    #     res.append(e)
+    # try:
+    #     async with test_engine.begin() as conn:
+    #         pass
+    # except Exception as e:
+    #     raise Exception((res, e))
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
@@ -77,7 +98,7 @@ async def insert_data(ws_lifespan):
         group_chat = GroupChat(name='1', type=ChatTypes.GROUP.value, creator=user1, users=[user1, user2])
         session.add(group_chat)
         await session.flush()
-        msg1 = Message(type=MessageTypes.DEFAULT.value, user=user1, chat=group_chat)
+        msg1 = DefaultMessage(type=MessageTypes.DEFAULT.value, user=user1, chat=group_chat)
         session.add(msg1)
         await session.commit()
 
@@ -96,5 +117,5 @@ client = TestClient(app)
 @pytest.fixture(scope='function')
 async def ac() -> AsyncGenerator[AsyncClient, None]:
     async with LifespanManager(app):
-        async with AsyncClient(app=app, base_url="http://test", transport=ASGIWebSocketTransport(app)) as ac:
+        async with AsyncClient(app=app, base_url="http://test", transport=ASGIWebSocketTransport(app=app)) as ac:
             yield ac

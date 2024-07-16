@@ -118,15 +118,6 @@ async def check_if_such_direct_chat_exists(user1_id: int, user2_id: int, session
         return True
 
 
-async def chat_check(chat_id: int, user_id: int, session: AsyncSession):
-    if chat := await check_if_user_in_chat_with_polymorphic(chat_id, user_id, session):
-        if chat.type == ChatTypes.DIRECT.value:
-            if chat.blocked_by_id:
-                raise WebSocketException(1008, "Chat is blocked")
-        return True
-    raise WebSocketException(1008, "You are not a member of this chat")
-
-
 async def create_group_chat(chat_data: GroupChatScheme, creator_id: int, session: AsyncSession):
     chat = GroupChat(name=chat_data.name, type=ChatTypes.GROUP.value)
     if creator := await get_user_by_id(creator_id, session):
@@ -135,11 +126,16 @@ async def create_group_chat(chat_data: GroupChatScheme, creator_id: int, session
         await session.flush()
         await session.refresh(chat, attribute_names=['users'])
         chat.users.append(creator)
+        if chat_data.avatar:
+            avatar = await upload_avatar(chat_data.avatar, chat.id, 'chat')
+            chat.avatar = avatar
         for user_id in chat_data.users_ids:
-            user = await get_user_by_id(user_id, session)
-            chat.users.append(user)
-            added = AddedDeletedUserHistory(user=user, chat=chat, added_dates=[datetime.utcnow()])
-            session.add(added)
+            if user := await get_user_by_id(user_id, session):
+                chat.users.append(user)
+                added = AddedDeletedUserHistory(user=user, chat=chat, added_dates=[datetime.utcnow()])
+                session.add(added)
+                continue
+            raise HTTPException(404, 'You are trying to add non-existent user')
         await session.flush()
         return chat
 
@@ -172,7 +168,7 @@ async def edit_group_chat(chat_id: int, data: EditGroupChatScheme, user_id: int,
             if v is not None and k not in ['avatar', 'add_users_ids', 'delete_users_ids']:
                 setattr(chat, k, v)
         if data.avatar:
-            avatar = await upload_avatar(data.avatar, user_id, 'chat')
+            avatar = await upload_avatar(data.avatar, chat_id, 'chat')
             chat.avatar = avatar
         new_users, delete_users = [], []
         if data.add_users_ids:

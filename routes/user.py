@@ -25,4 +25,4 @@ async def email_change_path(code: int, token=Depends(get_current_user), session=
     if email := await verify_email_change_code(token['user_id'], code):
         await set_new_email(token['user_id'], email, session)
         return {"msg": "Email изменен"}
-    raise HTTPException(status_code=400, detail='incorrect code')
+    raise HTTPException(status_code=400, detail='Incorrect code')
