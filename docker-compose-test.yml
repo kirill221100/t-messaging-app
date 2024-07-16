@@ -4,7 +4,7 @@ services:
     build: .
     ports:
       - 80:80
-    command: bash -c "export FFREPORT=file=/app/ffreport.log:level=48 && cd tests && pytest test_chat.py -s"
+    command: bash -c "export FFREPORT=file=/app/ffreport.log:level=48 && cd tests && pytest -s"
     environment:
       APP_NAME: "t_base"
     depends_on:
