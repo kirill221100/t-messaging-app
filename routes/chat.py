@@ -27,7 +27,10 @@ async def get_chat_path(chat_id: int, session: AsyncSession = Depends(get_sessio
     if chat.type == ChatTypes.GROUP.value:
         return GroupChatResponseSchemeWithUsers.from_orm(chat)
     elif chat.type == ChatTypes.DIRECT.value:
-        return DirectChatResponseScheme.from_orm(chat)
+        res = DirectChatResponseScheme.from_orm(chat)
+        res.first_user = chat.users[0]
+        res.second_user = chat.users[1]
+        return res
 
 
 @chat_router.post('/create-group-chat', response_model=GroupChatResponseScheme)
@@ -44,7 +47,7 @@ async def create_direct_chat_path(chat_data: DirectChatScheme,
     return await create_direct_chat_func(chat_data, token, session)
 
 
-@chat_router.put('/edit-group-chat/{chat_id}')
+@chat_router.put('/edit-group-chat/{chat_id}', response_model=GroupChatResponseSchemeWithUsers)
 async def edit_group_chat_path(chat_id: int, edit_data: EditGroupChatScheme,
                                session: AsyncSession = Depends(update_online_and_get_session),
                                token=Depends(get_current_user)):

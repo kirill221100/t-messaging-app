@@ -34,8 +34,10 @@ class GroupChatResponseScheme(ChatResponseScheme):
     name: str
     creator_id: int
 
+
 class GroupChatResponseSchemeWithUsers(GroupChatResponseScheme):
     users: List[UserResponseScheme]
+
 
 class EditGroupChatScheme(BaseModel):
     name: Optional[str] = None

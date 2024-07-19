@@ -27,7 +27,6 @@ async def upload_images_for_message_path(chat_id: int, images: List[UploadFile],
 async def upload_videos_for_message_path(chat_id: int, videos: List[UploadFile],
                                          session=Depends(update_online_and_get_session),
                                          token=Depends(get_current_user)):
-    logging.warning("start")
     return await upload_videos(videos, chat_id, token['user_id'])
 
 

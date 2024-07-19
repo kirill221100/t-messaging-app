@@ -10,6 +10,7 @@ from redis_utils.redis import message_manager
 import random
 import datetime
 from schemes.message import WSMessageTypes
+from schemes.chat import EditGroupChatScheme
 from db.models.message import InfoMessageTypes, MessageTypes
 from httpx_ws import aconnect_ws
 from httpx_ws._exceptions import WebSocketDisconnect
@@ -18,14 +19,28 @@ from wsproto.frame_protocol import CloseReason
 from sqlalchemy import select
 from db.models.message import Message
 from config import config
+from db.utils.user import get_user_by_id_with_chats
+from db.utils.chat import get_chat_by_id_with_users
 
 
-async def second_user_ws(token, ac):
+async def second_user_ws(token, ac, quantity=None):
+    res = []
     async with aconnect_ws(f'ws://test/chat/connect/ws?token={token}', ac) as ws:
         while True:
-            json_ws = (await ws.receive_json())['data']
+            try:
+                json_ws = (await ws.receive_json())['data']
+            except:
+                asasa = [message_manager.active_connections, message_manager.users_websockets]
+                await ws.close()
+                break
             if json_ws and type(json_ws) != int:
                 data = json.loads(json_ws)
+                if quantity:
+                    res.append(data)
+                    if len(res) == quantity:
+                        await ws.close()
+                        return res
+                    continue
                 await ws.close()
                 return data
 
@@ -48,6 +63,16 @@ async def exception_ws_request(route, data, ac: AsyncClient):
         except WebSocketDisconnect as er:
             await ws.close()
             return er
+
+
+@pytest.mark.anyio
+async def test_get_chat(ac: AsyncClient):
+    req1 = await ac.get(f'/chat/get-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'})
+    print(req1.json())
+    assert req1.status_code == 200
+    req1 = await ac.get(f'/chat/get-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    print(req1.json())
+    assert req1.status_code == 200
 
 
 @pytest.mark.anyio
@@ -116,7 +141,6 @@ async def test_creating_messages(ac: AsyncClient):
     req1 = await upload_test('test_files/test_pic.jpg', '/message/upload-images-for-message', "images", "image/jpeg",
                              tokens[0], ac, {"chat_id": 1})
     assert req1.status_code == 200
-
 
     async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
@@ -290,3 +314,51 @@ async def test_deleting_messages(ac: AsyncClient):
                     assert res1['ws_type'] == WSMessageTypes.DELETE_MESSAGE.value
                     break
         await ws.close()
+
+
+@pytest.mark.anyio
+async def test_edit_group_chat(ac: AsyncClient):
+    task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
+    task2 = asyncio.create_task(second_user_ws(tokens[2], ac, 3))
+    await asyncio.sleep(1)
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(name='test_name', add_users_ids=[3], delete_users_ids=[2]).dict())
+    assert req1.status_code == 200
+    chat = req1.json()
+    assert chat['name'] == 'test_name'
+    assert len(chat['users']) == 2
+    assert chat['users'][0]['id'] == 1
+    assert chat['users'][1]['id'] == 3
+    try:
+        await asyncio.wait_for(task1, timeout=20)
+    except:
+        pass
+    res = await task2
+    assert len(res) == 3
+    req1 = await ac.put(f'/chat/edit-group-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(name='test_name', add_users_ids=[3], delete_users_ids=[2]).dict())
+    assert req1.status_code == 404
+    assert req1.json()['detail'] == "Such group chat does not exist"
+
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(name='test_name', add_users_ids=[3], delete_users_ids=[2]).dict())
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == "User with id '3' is already in chat"
+
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[1]}'},
+                        json=EditGroupChatScheme(name='test_name', add_users_ids=[3], delete_users_ids=[2]).dict())
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == "You can't edit chat information"
+
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(delete_users_ids=[2]).dict())
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == "User with id '2' is not in chat"
+
+    req2 = await ac.patch(f'/chat/leave-group-chat/1', headers={"Authorization": f'Bearer {tokens[2]}'})
+    assert req2.status_code == 200
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(add_users_ids=[3]).dict())
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == "You cannot add user with id '3' because he left this chat"
+

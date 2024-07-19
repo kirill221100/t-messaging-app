@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from db.models.chat import Chat, ChatTypes, DirectChat, AddedDeletedUserHistory,
 from db.models.message import Message
 from schemes.chat import GroupChatScheme, DirectChatScheme, EditGroupChatScheme
 from schemes.message import WSMessageSchemeEdit
-from db.utils.user import get_user_by_id
+from db.utils.user import get_user_by_id, get_user_by_id_with_chats
 from db.utils.message import get_message_by_id
 from utils.aws import upload_avatar
 from typing import Optional
@@ -161,8 +162,8 @@ async def create_left_chat(chat: GroupChat, user_id: int, session: AsyncSession)
 
 async def edit_group_chat(chat_id: int, data: EditGroupChatScheme, user_id: int, session: AsyncSession):
     chat = await get_group_chat_by_id_with_users(chat_id, session)
-    if chat.type != ChatTypes.GROUP.value:
-        raise HTTPException(400, "This is not a group chat")
+    if not chat:
+        raise HTTPException(404, "Such group chat does not exist")
     if chat.creator_id == user_id:
         for k, v in data:
             if v is not None and k not in ['avatar', 'add_users_ids', 'delete_users_ids']:

@@ -59,6 +59,8 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                     try:
                         await chat_check(message_json['chat_id'], user_id, session, ws, channels)
                     except KeyError:
+                        await session.refresh(user)
+                        channels = [f"chat_{chat.id}" for chat in user.chats]
                         await message_manager.disconnect_from_many(ws, channels, user_id)
                         raise WebSocketException(1007, "There is no chat_id")
                     try:
@@ -88,6 +90,8 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                     await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                     raise WebSocketException(1007, "There is no message_type")
         except (WebSocketDisconnect, RuntimeError) as e:
+            await session.refresh(user)
+            channels = [f"chat_{chat.id}" for chat in user.chats]
             await message_manager.disconnect_from_many(ws, channels, user_id)
 
 
@@ -153,7 +157,6 @@ async def edit_group_chat_func(chat_id: int, data: EditGroupChatScheme, token: d
                                                   deleted_users=delete_users, user=user))
         await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
     await session.commit()
-
     for msg in messages:
         ws_data = {"ws_type": WSMessageTypes.INFO.value,
                    "msg": jsonable_encoder(InfoMessageResponseScheme.from_orm(msg))}
