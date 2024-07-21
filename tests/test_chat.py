@@ -10,17 +10,16 @@ from redis_utils.redis import message_manager
 import random
 import datetime
 from schemes.message import WSMessageTypes
-from schemes.chat import EditGroupChatScheme
-from db.models.message import InfoMessageTypes, MessageTypes
+from schemes.chat import EditGroupChatScheme, ChatTypes
+from db.models.message import InfoMessageTypes, MessageTypes, Message
 from httpx_ws import aconnect_ws
 from httpx_ws._exceptions import WebSocketDisconnect
 from tests.conftest import tokens, test_session
 from wsproto.frame_protocol import CloseReason
 from sqlalchemy import select
-from db.models.message import Message
 from config import config
-from db.utils.user import get_user_by_id_with_chats
-from db.utils.chat import get_chat_by_id_with_users
+from db.utils.chat import get_read_date
+from db.utils.message import get_message_by_id
 
 
 async def second_user_ws(token, ac, quantity=None):
@@ -68,10 +67,8 @@ async def exception_ws_request(route, data, ac: AsyncClient):
 @pytest.mark.anyio
 async def test_get_chat(ac: AsyncClient):
     req1 = await ac.get(f'/chat/get-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'})
-    print(req1.json())
     assert req1.status_code == 200
     req1 = await ac.get(f'/chat/get-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
-    print(req1.json())
     assert req1.status_code == 200
 
 
@@ -106,11 +103,11 @@ async def test_creating_group_chats(ac: AsyncClient):
 @pytest.mark.anyio
 async def test_creating_direct_chats(ac: AsyncClient):
     print("!!!!test_creating_direct_chats!!!!")
-    task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
+    task1 = asyncio.create_task(second_user_ws(tokens[2], ac))
     async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         req1 = await ac.post(f'/chat/create-direct-chat',
                              headers={"Authorization": f'Bearer {tokens[0]}'},
-                             json=DirectChatScheme(user_id=2).dict())
+                             json=DirectChatScheme(user_id=3).dict())
         assert req1.status_code == 200
         await ws.send_json(
             {"text": "hi", "chat_id": req1.json()['id'], "message_type": WSMessageTypes.CREATE_MESSAGE.value})
@@ -126,7 +123,7 @@ async def test_creating_direct_chats(ac: AsyncClient):
         await ws.close()
     req1 = await ac.post(f'/chat/create-direct-chat',
                          headers={"Authorization": f'Bearer {tokens[0]}'},
-                         json=DirectChatScheme(user_id=2).dict())
+                         json=DirectChatScheme(user_id=3).dict())
     assert req1.status_code == 409
     assert req1.json()['detail'] == "Such direct chat already exists"
 
@@ -164,6 +161,17 @@ async def test_creating_messages(ac: AsyncClient):
                     assert res1['msg']['videos'] != []
                     break
         await ws.close()
+
+    req1 = await ac.patch(f'/chat/block-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json() == {'msg': "Chat was blocked"}
+    er = await exception_ws_request(f'ws://test/chat/connect/ws?token={tokens[0]}',
+                                    {"text": "hi", "message_type": WSMessageTypes.CREATE_MESSAGE.value, "chat_id": 2},
+                                    ac)
+    assert er.code == CloseReason.POLICY_VIOLATION
+    assert er.reason == "Chat is blocked"
+    req1 = await ac.patch(f'/chat/unblock-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json() == {'msg': "Chat was unblocked"}
+
     er = await exception_ws_request(f'ws://test/chat/connect/ws?token={tokens[0]}',
                                     {"text": "hi", "chat_id": 45, "message_type": WSMessageTypes.CREATE_MESSAGE.value},
                                     ac)
@@ -187,12 +195,12 @@ async def test_creating_messages(ac: AsyncClient):
                                     ac)
     assert er.code == CloseReason.INVALID_FRAME_PAYLOAD_DATA
     assert er.reason == "There is no chat_id"
-    print(message_manager.active_connections)
 
 
 @pytest.mark.anyio
 async def test_editing_messages(ac: AsyncClient):
     print("!!!!test_editing_messages!!!!")
+    print(message_manager.active_connections)
     req1 = await upload_test('test_files/test_pic.jpg', '/message/upload-images-for-message', "images", "image/jpeg",
                              tokens[0], ac, {"chat_id": 1})
     assert req1.status_code == 200
@@ -217,7 +225,7 @@ async def test_editing_messages(ac: AsyncClient):
                                  tokens[0], ac, {"chat_id": 1, "image_index": 0})
         assert req3.status_code == 200
         task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         await ws.send_json(
             {"text": "edit", "chat_id": 1, "message_id": data['msg']['id'],
              "message_type": WSMessageTypes.EDIT_MESSAGE.value, "photo": {0: req3.json()}})
@@ -234,11 +242,12 @@ async def test_editing_messages(ac: AsyncClient):
                     assert res['msg']['text'] == 'edit'
                     assert res['msg']['photos'][0] != data['msg']['photos'][0]
                     break
+        await asyncio.sleep(1)
         req4 = await upload_test('test_files/test_vid2.mp4', '/message/upload-video-for-message', "video", "video/mp4",
                                  tokens[0], ac, {"chat_id": 1, "video_index": 0})
         assert req4.status_code == 200
         task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         await ws.send_json(
             {"text": "edit", "chat_id": 1, "message_id": data['msg']['id'],
              "message_type": WSMessageTypes.EDIT_MESSAGE.value, "video": {0: req4.json()}})
@@ -361,4 +370,141 @@ async def test_edit_group_chat(ac: AsyncClient):
                         json=EditGroupChatScheme(add_users_ids=[3]).dict())
     assert req1.status_code == 403
     assert req1.json()['detail'] == "You cannot add user with id '3' because he left this chat"
+
+
+@pytest.mark.anyio
+async def test_get_users_chats(ac: AsyncClient):
+    req1 = await ac.get(f'/chat/get-my-chats', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.status_code == 200
+    chats = req1.json()
+    assert chats[0]['type'] == ChatTypes.GROUP.value
+    assert chats[1]['type'] == ChatTypes.DIRECT.value
+
+
+@pytest.mark.anyio
+async def test_delete_my_chat_history(ac: AsyncClient):
+    req1 = await ac.delete(f'/chat/delete-my-chat-history/1', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json() == {'msg': "Chat history was deleted"}
+    req1 = await ac.get(f'/message/get-messages-by-chat-id/1', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json()['messages'] == []
+    req1 = await ac.get(f'/message/get-messages-by-chat-id/1', headers={"Authorization": f'Bearer {tokens[1]}'})
+    assert req1.json()['messages'] != []
+
+    req1 = await ac.delete(f'/chat/delete-my-chat-history/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json() == {'msg': "Chat history was deleted"}
+    req1 = await ac.get(f'/message/get-messages-by-chat-id/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json()['messages'] == []
+    req1 = await ac.get(f'/message/get-messages-by-chat-id/2', headers={"Authorization": f'Bearer {tokens[1]}'})
+    assert req1.json()['messages'] != []
+
+    req1 = await ac.delete(f'/chat/delete-my-chat-history/1', headers={"Authorization": f'Bearer {tokens[3]}'})
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == 'You are not a member of this chat'
+
+
+@pytest.mark.anyio
+async def test_block_unblock_direct_chat(ac: AsyncClient):
+    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
+        task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
+        await asyncio.sleep(1)
+        req1 = await ac.patch(f'/chat/block-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+        assert req1.json() == {'msg': "Chat was blocked"}
+        while True:
+            json_ws = await ws.receive_json()
+            if json_ws['data'] and type(json_ws['data']) != int:
+                data = json.loads(json_ws['data'])
+                assert data['ws_type'] == WSMessageTypes.BLOCK.value
+                res = await task1
+                assert res['ws_type'] == WSMessageTypes.BLOCK.value
+                break
+        req2 = await ac.get(f'/chat/get-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+        assert req2.json()['blocked_by_id'] == 1
+
+        task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
+        await asyncio.sleep(1)
+        req1 = await ac.patch(f'/chat/unblock-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+        assert req1.json() == {'msg': "Chat was unblocked"}
+        while True:
+            json_ws = await ws.receive_json()
+            if json_ws['data'] and type(json_ws['data']) != int:
+                data = json.loads(json_ws['data'])
+                assert data['ws_type'] == WSMessageTypes.UNBLOCK.value
+                res = await task1
+                assert res['ws_type'] == WSMessageTypes.UNBLOCK.value
+                break
+        req2 = await ac.get(f'/chat/get-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+        assert req2.json()['blocked_by_id'] is None
+        await ws.close()
+
+    req1 = await ac.patch(f'/chat/block-direct-chat/343434', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == 'Either there is no such direct chat or you are not a member of this chat'
+    req1 = await ac.patch(f'/chat/block-direct-chat/343434', headers={"Authorization": f'Bearer {tokens[3]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == 'Either there is no such direct chat or you are not a member of this chat'
+
+    req1 = await ac.patch(f'/chat/block-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json() == {'msg': "Chat was blocked"}
+    req2 = await ac.patch(f'/chat/block-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req2.status_code == 400
+    assert req2.json()['detail'] == 'Chat is already blocked'
+
+    req1 = await ac.patch(f'/chat/unblock-direct-chat/2', headers={"Authorization": f'Bearer {tokens[1]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == "You can't unblock this chat because other user blocked it"
+
+    req1 = await ac.patch(f'/chat/unblock-direct-chat/343434', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == 'Either there is no such direct chat or you are not a member of this chat'
+    req1 = await ac.patch(f'/chat/unblock-direct-chat/343434', headers={"Authorization": f'Bearer {tokens[3]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == 'Either there is no such direct chat or you are not a member of this chat'
+
+    req1 = await ac.patch(f'/chat/unblock-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.json() == {'msg': "Chat was unblocked"}
+    req1 = await ac.patch(f'/chat/unblock-direct-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == 'Chat is already unblocked'
+
+
+@pytest.mark.anyio
+async def test_read_messages(ac: AsyncClient):
+    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
+        task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
+        await asyncio.sleep(1)
+        req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[0]}'}, params={'message_id': 1})
+        while True:
+            json_ws = await ws.receive_json()
+            if json_ws['data'] and type(json_ws['data']) != int:
+                data = json.loads(json_ws['data'])
+                assert data['ws_type'] == WSMessageTypes.MESSAGE_READ.value
+                res = await task1
+                assert res['ws_type'] == WSMessageTypes.MESSAGE_READ.value
+                break
+        assert req1.json() == {"msg": "Done"}
+        async with test_session() as s:
+            read_date = await get_read_date(1, 1, s)
+            message = await get_message_by_id(1, s)
+            assert read_date.date == message.date
+
+        req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[0]}'})
+        assert req1.json() == {"msg": "Done"}
+        async with test_session() as s:
+            read_date = await get_read_date(1, 1, s)
+            message = await get_message_by_id(1, s)
+            assert read_date.date != message.date
+
+    req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[3]}'})
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == 'You are not a member of this chat'
+
+
+
+
+
+
+
+
+
+
 

@@ -67,9 +67,7 @@ async def get_deleted_history(user_id: int, chat_id: int, session: AsyncSession)
 
 async def get_read_date(chat_id: int, user_id: int, session: AsyncSession):
     read_date = (await session.execute(select(ReadDate).filter_by(chat_id=chat_id, user_id=user_id))).scalar_one_or_none()
-    if read_date:
-        return read_date.date
-    return None
+    return read_date
 
 
 async def get_read_date_from_others(chat_id: int, user_id: int, session: AsyncSession):

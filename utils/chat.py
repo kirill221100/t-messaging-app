@@ -27,6 +27,7 @@ async def chat_check(chat_id: int, user_id: int, session: AsyncSession, ws: WebS
     if chat := await check_if_user_in_chat_with_polymorphic(chat_id, user_id, session):
         if chat.type == ChatTypes.DIRECT.value:
             if chat.blocked_by_id:
+                await message_manager.disconnect_from_many(ws, channels, user_id)
                 raise WebSocketException(1008, "Chat is blocked")
         return True
     await message_manager.disconnect_from_many(ws, channels, user_id)
@@ -57,10 +58,12 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                 if msg_type := message_json.get('message_type'):
                     message, message_model = None, None
                     try:
-                        await chat_check(message_json['chat_id'], user_id, session, ws, channels)
-                    except KeyError:
                         await session.refresh(user)
                         channels = [f"chat_{chat.id}" for chat in user.chats]
+                        await chat_check(message_json['chat_id'], user_id, session, ws, channels)
+                    except KeyError:
+                        # await session.refresh(user)
+                        # channels = [f"chat_{chat.id}" for chat in user.chats]
                         await message_manager.disconnect_from_many(ws, channels, user_id)
                         raise WebSocketException(1007, "There is no chat_id")
                     try:
@@ -72,7 +75,8 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                             try:
                                 message = await edit_message(message_model, session)
                             except WebSocketException as e:
-                                await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
+                                await message_manager.disconnect_from_many(ws, channels, user_id)
+                                #await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                                 raise e
                         elif msg_type == WSMessageTypes.DELETE_MESSAGE.value:
                             message_model = WSMessageSchemeDelete.model_validate_json(json.dumps(message_json))
@@ -82,12 +86,14 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                         else:
                             json_message = jsonable_encoder(message_model)
                     except ValidationError as e:
-                        await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
+                        await message_manager.disconnect_from_many(ws, channels, user_id)
+                        #await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                         raise WebSocketException(1007, e.errors()[0]['msg'])
                     data = {"ws_type": msg_type, "msg": json_message}
                     await message_manager.send_message_to_room(f"chat_{str(json_message['chat_id'])}", data)
                 else:
-                    await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
+                    await message_manager.disconnect_from_many(ws, channels, user_id)
+                    #await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                     raise WebSocketException(1007, "There is no message_type")
         except (WebSocketDisconnect, RuntimeError) as e:
             await session.refresh(user)
@@ -120,7 +126,7 @@ async def create_direct_chat_func(chat_data: DirectChatScheme, token: dict, sess
     return res
 
 
-async def get_users_chats_func(token: dict, session: AsyncSession):
+async def get_my_chats_func(token: dict, session: AsyncSession):
     chats = await get_chats_by_user_id(token['user_id'], session)
     resp = []
     for chat in chats:

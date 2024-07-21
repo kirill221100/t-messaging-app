@@ -76,11 +76,12 @@ async def insert_data(ws_lifespan):
         user1 = User(username='1', email='1@example.com')
         user2 = User(username='2', email='2@example.com')
         user3 = User(username='3', email='3@example.com')
-        session.add_all([user1, user2, user3])
+        user4 = User(username='4', email='4@example.com')
+        session.add_all([user1, user2, user3, user4])
         await session.flush()
         global tokens
         tokens.extend([create_access_token({'user_id': user1.id}), create_access_token({'user_id': user2.id}),
-                       create_access_token({'user_id': user3.id})])
+                       create_access_token({'user_id': user3.id}), create_access_token({'user_id': user4.id})])
         group_chat = GroupChat(name='1', type=ChatTypes.GROUP.value, creator=user1, users=[user1, user2])
         session.add(group_chat)
         direct_chat = DirectChat(type=ChatTypes.DIRECT.value, users=[user1, user2])
@@ -90,10 +91,13 @@ async def insert_data(ws_lifespan):
         added2 = AddedDeletedUserHistory(user=user2, chat=group_chat, added_dates=[datetime.utcnow()])
         session.add_all([added1, added2])
         await session.flush()
-        msg1 = DefaultMessage(type=MessageTypes.DEFAULT.value, user=user1, chat=group_chat)
-        session.add(msg1)
-        msg2 = DefaultMessage(type=MessageTypes.DEFAULT.value, user=user1, chat=direct_chat)
-        session.add(msg2)
+        msg1 = DefaultMessage(type=MessageTypes.DEFAULT.value, text='1', user=user1, chat=group_chat)
+        msg2 = DefaultMessage(type=MessageTypes.DEFAULT.value, text='2', user=user1, chat=group_chat)
+        msg3 = DefaultMessage(type=MessageTypes.DEFAULT.value, text='3', user=user1, chat=group_chat)
+        msg4 = DefaultMessage(type=MessageTypes.DEFAULT.value, text='4', user=user1, chat=direct_chat)
+        msg5 = DefaultMessage(type=MessageTypes.DEFAULT.value, text='5', user=user1, chat=direct_chat)
+        msg6 = DefaultMessage(type=MessageTypes.DEFAULT.value, text='6', user=user1, chat=direct_chat)
+        session.add_all([msg1, msg2, msg3, msg4, msg5, msg6])
         await session.commit()
 
 

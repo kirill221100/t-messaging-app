@@ -154,7 +154,7 @@ class MessageManager:
                     await self.disconnect(connection, channel)
 
     async def send_message_to_room(self, channel: str, message):
-        if message_manager.active_connections.get(channel):
+        if (ch := message_manager.active_connections.get(channel)) and ch != []:
             await redis.publish(channel, json.dumps(message))
 
 

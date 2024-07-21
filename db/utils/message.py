@@ -62,6 +62,7 @@ async def make_query_without_deleted_history(history_query_str: str, ad_history:
 async def get_messages_by_chat_id(chat_id: int, session: AsyncSession, deleted_history: DeletedHistory,
                                   ad_history: AddedDeletedUserHistory, left_chat: LeftGroupChat,
                                   count: int = 10, last_message_id: int = None):
+    print(chat_id, 33333)
     history_query_str = '('
     if ad_history:
         if deleted_history:
@@ -74,8 +75,10 @@ async def get_messages_by_chat_id(chat_id: int, session: AsyncSession, deleted_h
             history_query_str = f"messages.date >= '{deleted_history.date}'"
     if left_chat:
         history_query_str += f") AND (messages.date < '{left_chat.leave_dates[-1]}' OR messages.date > '{left_chat.return_dates[-1]}'))"
-    else:
+    elif not left_chat and ad_history:
         history_query_str += ')'
+    elif not left_chat and not ad_history and not deleted_history:
+        history_query_str = ''
     if last_message_id:
         return (await session.execute(select(Message)
                                       .options(selectin_polymorphic(Message, [DefaultMessage, InfoMessage]),
