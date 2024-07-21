@@ -77,12 +77,15 @@ async def insert_data(ws_lifespan):
         user2 = User(username='2', email='2@example.com')
         user3 = User(username='3', email='3@example.com')
         user4 = User(username='4', email='4@example.com')
-        session.add_all([user1, user2, user3, user4])
+        user5 = User(username='5', email='5@example.com')
+        user6 = User(username='6', email='6@example.com')
+        session.add_all([user1, user2, user3, user4, user5, user6])
         await session.flush()
         global tokens
         tokens.extend([create_access_token({'user_id': user1.id}), create_access_token({'user_id': user2.id}),
-                       create_access_token({'user_id': user3.id}), create_access_token({'user_id': user4.id})])
-        group_chat = GroupChat(name='1', type=ChatTypes.GROUP.value, creator=user1, users=[user1, user2])
+                       create_access_token({'user_id': user3.id}), create_access_token({'user_id': user4.id}),
+                       create_access_token({'user_id': user5.id}), create_access_token({'user_id': user6.id})])
+        group_chat = GroupChat(name='1', type=ChatTypes.GROUP.value, creator=user1, users=[user1, user2, user5])
         session.add(group_chat)
         direct_chat = DirectChat(type=ChatTypes.DIRECT.value, users=[user1, user2])
         session.add(direct_chat)
