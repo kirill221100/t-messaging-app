@@ -327,6 +327,7 @@ async def test_deleting_messages(ac: AsyncClient):
 
 @pytest.mark.anyio
 async def test_edit_group_chat(ac: AsyncClient):
+    print("!!!!test_edit_group_chat!!!!")
     task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
     task2 = asyncio.create_task(second_user_ws(tokens[2], ac, 3))
     await asyncio.sleep(1)
@@ -374,6 +375,7 @@ async def test_edit_group_chat(ac: AsyncClient):
 
 @pytest.mark.anyio
 async def test_get_users_chats(ac: AsyncClient):
+    print("!!!!test_get_users_chats!!!!")
     req1 = await ac.get(f'/chat/get-my-chats', headers={"Authorization": f'Bearer {tokens[0]}'})
     assert req1.status_code == 200
     chats = req1.json()
@@ -383,6 +385,7 @@ async def test_get_users_chats(ac: AsyncClient):
 
 @pytest.mark.anyio
 async def test_delete_my_chat_history(ac: AsyncClient):
+    print("!!!!test_delete_my_chat_history!!!!")
     req1 = await ac.delete(f'/chat/delete-my-chat-history/1', headers={"Authorization": f'Bearer {tokens[0]}'})
     assert req1.json() == {'msg': "Chat history was deleted"}
     req1 = await ac.get(f'/message/get-messages-by-chat-id/1', headers={"Authorization": f'Bearer {tokens[0]}'})
@@ -404,6 +407,7 @@ async def test_delete_my_chat_history(ac: AsyncClient):
 
 @pytest.mark.anyio
 async def test_block_unblock_direct_chat(ac: AsyncClient):
+    print("!!!!test_block_unblock_direct_chat!!!!")
     async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
         await asyncio.sleep(1)
@@ -469,6 +473,7 @@ async def test_block_unblock_direct_chat(ac: AsyncClient):
 
 @pytest.mark.anyio
 async def test_read_messages(ac: AsyncClient):
+    print("!!!!test_read_messages!!!!")
     async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
         await asyncio.sleep(1)
