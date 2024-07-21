@@ -5,21 +5,21 @@ from schemes.auth import RegisterScheme
 
 @pytest.mark.anyio
 async def test_registration(ac: AsyncClient):
-    req1 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="3@example.com", username='3').dict())
+    req1 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="7@example.com", username='7').dict())
     assert req1.status_code == 200
 
-    req2 = await ac.get(f'/auth/email-reg', params={'email': "3@example.com", 'code': req1.json()})
+    req2 = await ac.get(f'/auth/email-reg', params={'email': "7@example.com", 'code': req1.json()})
     assert req2.status_code == 200
 
-    req2 = await ac.get(f'/auth/email-reg', params={'email': "3@example.com", 'code': 2323424234534543563535})
+    req2 = await ac.get(f'/auth/email-reg', params={'email': "7@example.com", 'code': 2323424234534543563535})
     assert req2.status_code == 400
     assert req2.json()['detail'] == 'Incorrect code'
 
-    req3 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="3@example.com", username='4').dict())
+    req3 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="7@example.com", username='77').dict())
     assert req3.status_code == 409
     assert req3.json()['detail'] == 'Email already registered'
 
-    req4 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="4@example.com", username='3').dict())
+    req4 = await ac.post(f'/auth/email-reg-send', json=RegisterScheme(email="8@example.com", username='3').dict())
     assert req4.status_code == 409
     assert req4.json()['detail'] == 'Username already registered'
 

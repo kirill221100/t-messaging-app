@@ -472,7 +472,7 @@ async def test_read_messages(ac: AsyncClient):
     async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[0]}', ac) as ws:
         task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
         await asyncio.sleep(1)
-        req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[0]}'}, params={'message_id': 1})
+        req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[0]}'}, params={'message_id': 2})
         while True:
             json_ws = await ws.receive_json()
             if json_ws['data'] and type(json_ws['data']) != int:
@@ -484,14 +484,14 @@ async def test_read_messages(ac: AsyncClient):
         assert req1.json() == {"msg": "Done"}
         async with test_session() as s:
             read_date = await get_read_date(1, 1, s)
-            message = await get_message_by_id(1, s)
+            message = await get_message_by_id(2, s)
             assert read_date.date == message.date
 
         req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[0]}'})
         assert req1.json() == {"msg": "Done"}
         async with test_session() as s:
             read_date = await get_read_date(1, 1, s)
-            message = await get_message_by_id(1, s)
+            message = await get_message_by_id(2, s)
             assert read_date.date != message.date
 
     req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[3]}'})
