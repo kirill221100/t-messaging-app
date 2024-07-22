@@ -1,6 +1,6 @@
 import datetime
 from typing import List, Union, Optional
-from fastapi import APIRouter, Depends, WebSocket, BackgroundTasks
+from fastapi import APIRouter, Depends, WebSocket, HTTPException
 from security.auth import get_current_user_ws, get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models.chat import ChatTypes
@@ -26,6 +26,8 @@ async def connect_path(ws: WebSocket, session: AsyncSession = Depends(update_onl
                  response_model=Union[GroupChatResponseSchemeWithUsers, DirectChatResponseScheme])
 async def get_chat_path(chat_id: int, session: AsyncSession = Depends(get_session)):
     chat = await get_chat_by_id_polymorphic_with_users(chat_id, session)
+    if not chat:
+        raise HTTPException(404, 'No such chat')
     if chat.type == ChatTypes.GROUP.value:
         return GroupChatResponseSchemeWithUsers.from_orm(chat)
     elif chat.type == ChatTypes.DIRECT.value:
