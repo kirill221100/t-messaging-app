@@ -482,16 +482,12 @@ async def test_read_messages(ac: AsyncClient):
         task1 = asyncio.create_task(second_user_ws(tokens[4], ac))
         await asyncio.sleep(1)
         req1 = await ac.patch(f'/chat/read-messages/1', headers={"Authorization": f'Bearer {tokens[0]}'}, params={'message_id': 2})
-        logging.warning("!!!!test_read_messages!!!!3")
         while True:
             json_ws = await ws.receive_json()
-            logging.warning("!!!!test_read_messages!!!!4")
             if json_ws['data'] and type(json_ws['data']) != int:
-                logging.warning("!!!!test_read_messages!!!!5")
                 data = json.loads(json_ws['data'])
                 assert data['ws_type'] == WSMessageTypes.MESSAGE_READ.value
                 res = await task1
-                logging.warning("!!!!test_read_messages!!!!6")
                 assert res['ws_type'] == WSMessageTypes.MESSAGE_READ.value
                 break
         assert req1.json() == {"msg": "Done"}
@@ -512,7 +508,65 @@ async def test_read_messages(ac: AsyncClient):
     assert req1.json()['detail'] == 'You are not a member of this chat'
 
 
+@pytest.mark.anyio
+async def test_left_return_to_group(ac: AsyncClient):
+    async with aconnect_ws(f'ws://test/chat/connect/ws?token={tokens[4]}', ac) as ws:
+        task1 = asyncio.create_task(second_user_ws(tokens[0], ac))
+        await asyncio.sleep(1)
+        req1 = await ac.patch(f'/chat/leave-group-chat/1', headers={"Authorization": f'Bearer {tokens[4]}'})
+        assert req1.json() == {"msg": "Done"}
+        while True:
+            json_ws = await ws.receive_json()
+            if json_ws['data'] and type(json_ws['data']) != int:
+                data = json.loads(json_ws['data'])
+                assert data['msg']['info_type'] == InfoMessageTypes.LEFT_CHAT.value
+                res = await task1
+                assert res['msg']['info_type'] == InfoMessageTypes.LEFT_CHAT.value
+                break
 
+        task1 = asyncio.create_task(second_user_ws(tokens[0], ac))
+        await asyncio.sleep(1)
+        req1 = await ac.patch(f'/chat/return-to-group-chat/1', headers={"Authorization": f'Bearer {tokens[4]}'})
+        assert req1.json() == {"msg": "Done"}
+        while True:
+            json_ws = await ws.receive_json()
+            if json_ws['data'] and type(json_ws['data']) != int:
+                data = json.loads(json_ws['data'])
+                assert data['msg']['info_type'] == InfoMessageTypes.RETURN_TO_CHAT.value
+                res = await task1
+                assert res['msg']['info_type'] == InfoMessageTypes.RETURN_TO_CHAT.value
+                break
+        await ws.close()
+
+    req1 = await ac.patch(f'/chat/leave-group-chat/2', headers={"Authorization": f'Bearer {tokens[4]}'})
+    assert req1.status_code == 404
+    assert req1.json()['detail'] == 'There is no such group chat'
+
+    req1 = await ac.patch(f'/chat/leave-group-chat/1', headers={"Authorization": f'Bearer {tokens[3]}'})
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == 'You are not a member of this chat'
+
+    req1 = await ac.patch(f'/chat/return-to-group-chat/2', headers={"Authorization": f'Bearer {tokens[4]}'})
+    assert req1.status_code == 404
+    assert req1.json()['detail'] == 'There is no such group chat'
+
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(delete_users_ids=[5]).dict())
+    assert req1.status_code == 200
+    req1 = await ac.patch(f'/chat/return-to-group-chat/1', headers={"Authorization": f'Bearer {tokens[4]}'})
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == 'You were deleted from this chat'
+    req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
+                        json=EditGroupChatScheme(add_users_ids=[5]).dict())
+    assert req1.status_code == 200
+
+    req1 = await ac.patch(f'/chat/return-to-group-chat/1', headers={"Authorization": f'Bearer {tokens[3]}'})
+    assert req1.status_code == 403
+    assert req1.json()['detail'] == 'You are not a member of this chat'
+
+    req1 = await ac.patch(f'/chat/return-to-group-chat/1', headers={"Authorization": f'Bearer {tokens[4]}'})
+    assert req1.status_code == 400
+    assert req1.json()['detail'] == 'You have already returned to the chat'
 
 
 

@@ -93,8 +93,8 @@ class MessageManager:
     async def connect_added_user(self, user_id: int, channel: str):
         if not (room := self.active_connections.get(channel)) and room is None:
             room = []
-        if ws := self.users_websockets.get(user_id)[-1]:
-            room.append(ws)
+        if ws := self.users_websockets.get(user_id):
+            room.append(ws[-1])
         if not self.active_connections.get(channel):
             self.active_connections[channel] = room
             subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
