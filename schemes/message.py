@@ -24,7 +24,6 @@ class WSMessageTypes(Enum):
 def check_photos_size(photos: List[bytes]):
     max_size_photo = config.MAX_PHOTO_SIZE_MB * 1_000_000
     for photo in photos:
-        print(len(photo))
         assert len(photo) <= max_size_photo, f"Every photo must be less than {config.MAX_PHOTO_SIZE_MB} MB"
 
 

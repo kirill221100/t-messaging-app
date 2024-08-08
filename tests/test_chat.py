@@ -1,6 +1,5 @@
 import asyncio
 import logging
-
 import aiofiles
 from httpx import AsyncClient
 import pytest
@@ -31,7 +30,6 @@ async def second_user_ws(token, ac, quantity=None):
             try:
                 json_ws = (await ws.receive_json())['data']
             except:
-                asasa = [message_manager.active_connections, message_manager.users_websockets]
                 await ws.close()
                 break
             if json_ws and type(json_ws) != int:
@@ -330,7 +328,7 @@ async def test_deleting_messages(ac: AsyncClient):
 @pytest.mark.anyio
 async def test_edit_group_chat(ac: AsyncClient):
     print("!!!!test_edit_group_chat!!!!")
-    task1 = asyncio.create_task(second_user_ws(tokens[1], ac))
+    task1 = asyncio.create_task(second_user_ws(tokens[1], ac, 3))
     task2 = asyncio.create_task(second_user_ws(tokens[2], ac, 3))
     await asyncio.sleep(1)
     req1 = await ac.put(f'/chat/edit-group-chat/1', headers={"Authorization": f'Bearer {tokens[0]}'},
@@ -339,13 +337,11 @@ async def test_edit_group_chat(ac: AsyncClient):
     chat = req1.json()
     assert chat['name'] == 'test_name'
     assert len(chat['users']) == 3
-    assert chat['users'][0]['id'] == 5
-    assert chat['users'][1]['id'] == 1
+    assert chat['users'][0]['id'] == 1
+    assert chat['users'][1]['id'] == 5
     assert chat['users'][2]['id'] == 3
-    try:
-        await asyncio.wait_for(task1, timeout=20)
-    except:
-        pass
+    res1 = await task1
+    assert len(res1) == 3
     res = await task2
     assert len(res) == 3
     req1 = await ac.put(f'/chat/edit-group-chat/2', headers={"Authorization": f'Bearer {tokens[0]}'},
@@ -394,7 +390,6 @@ async def test_delete_my_chat_history(ac: AsyncClient):
     req1 = await ac.get(f'/message/get-messages-by-chat-id/1', headers={"Authorization": f'Bearer {tokens[0]}'})
     assert req1.json()['messages'] == []
     req1 = await ac.get(f'/message/get-messages-by-chat-id/1', headers={"Authorization": f'Bearer {tokens[4]}'})
-    print(req1.json())
     assert req1.json()['messages'] != []
 
     req1 = await ac.delete(f'/chat/delete-my-chat-history/2', headers={"Authorization": f'Bearer {tokens[0]}'})

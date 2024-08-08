@@ -83,9 +83,9 @@ class ReadDate(Base):
 class LeftGroupChat(Base):
     __tablename__ = 'left_group_chat'
     leave_dates: Mapped[List[datetime.datetime]] = mapped_column(ARRAY(DateTime), server_default='{}',
-                                                                 nullable=False)  # when user was added
+                                                                 nullable=False)  # when user leaved
     return_dates: Mapped[List[datetime.datetime]] = mapped_column(ARRAY(DateTime), server_default='{}',
-                                                                   nullable=True)  # when user was deleted
+                                                                   nullable=True)  # when user returned
     user: Mapped["User"] = relationship()
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id"), primary_key=True)

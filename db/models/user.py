@@ -17,3 +17,5 @@ class User(Base):
     messages: Mapped[List["Message"]] = relationship(back_populates='user')
     last_time_online: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
     deleted_chat_history: Mapped[List["DeletedHistory"]] = relationship()
+    new_user_messages: Mapped[List["InfoMessage"]] = relationship(uselist=True, secondary="new_users_association_table", back_populates='new_users')
+    deleted_user_messages: Mapped[List["InfoMessage"]] = relationship(uselist=True, secondary="delete_users_association_table", back_populates='deleted_users')

@@ -14,6 +14,7 @@ from schemes.chat import GroupChatScheme, DirectChatScheme, GroupChatResponseSch
 from db.utils.chat import create_group_chat, create_direct_chat, get_chats_by_user_id, ChatTypes, edit_group_chat, \
     block_direct_chat, unblock_direct_chat, read_messages, check_if_user_in_chat_with_polymorphic, get_left_chat, create_left_chat, \
     get_group_chat_by_id_with_users, get_added_deleted_user_history
+from db.utils.message import get_message_by_id_check
 from db.models.message import InfoMessageTypes
 from db.db_setup import get_session
 import json
@@ -141,7 +142,12 @@ async def get_my_chats_func(token: dict, session: AsyncSession):
 
 
 async def edit_group_chat_func(chat_id: int, data: EditGroupChatScheme, token: dict, session: AsyncSession):
-    chat, new_users, delete_users = await edit_group_chat(chat_id, data, token['user_id'], session)
+    # print('-----')
+    # try:
+    #     print((await get_message_by_id_check(7, session)).new_users[0].id, 4545454545454777)
+    # except:
+    #     pass
+    chat, new_users_message, delete_users_message = await edit_group_chat(chat_id, data, token['user_id'], session)
     user = await get_user_by_id(token['user_id'], session)
     messages = []
     if data.avatar:
@@ -152,22 +158,23 @@ async def edit_group_chat_func(chat_id: int, data: EditGroupChatScheme, token: d
         messages.append(await create_info_message(chat_id=chat_id,
                                                   session=session, info_type=InfoMessageTypes.CHANGE_NAME.value,
                                                   new_name=chat.name, user=user))
-    if new_users:
-        messages.append(await create_info_message(chat_id=chat_id,
-                                                  session=session, info_type=InfoMessageTypes.ADD_USERS.value,
-                                                  new_users=new_users, user=user))
+    if new_users_message:
+        messages.append(new_users_message)
         await message_manager.connect_added_users(data.add_users_ids, f"chat_{chat_id}")
-    if delete_users:
-        messages.append(await create_info_message(chat_id=chat_id,
-                                                  session=session, info_type=InfoMessageTypes.DELETE_USERS.value,
-                                                  deleted_users=delete_users, user=user))
-        await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
-    await session.commit()
+    if delete_users_message:
+        messages.append(delete_users_message)
+        #await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 4545454545454777)
+
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 232323)
     for msg in messages:
         ws_data = {"ws_type": WSMessageTypes.INFO.value,
                    "msg": jsonable_encoder(InfoMessageResponseScheme.from_orm(msg))}
         await message_manager.send_message_to_room(f"chat_{chat_id}", ws_data)
-
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 232323)
+    await session.commit()
+    if delete_users_message:
+        await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
     return chat
 
 

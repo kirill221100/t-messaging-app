@@ -6,12 +6,13 @@ from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import selectinload, selectin_polymorphic
 from sqlalchemy.orm.attributes import flag_modified
 from fastapi import HTTPException, WebSocketException
-from db.models.chat import Chat, ChatTypes, DirectChat, AddedDeletedUserHistory, GroupChat, DeletedHistory, ReadDate, LeftGroupChat
-from db.models.message import Message
+from db.models.chat import Chat, ChatTypes, DirectChat, AddedDeletedUserHistory, GroupChat, DeletedHistory, ReadDate, \
+    LeftGroupChat
+from db.models.message import Message, InfoMessageTypes
 from schemes.chat import GroupChatScheme, DirectChatScheme, EditGroupChatScheme
 from schemes.message import WSMessageSchemeEdit
 from db.utils.user import get_user_by_id, get_user_by_id_with_chats
-from db.utils.message import get_message_by_id
+from db.utils.message import get_message_by_id, create_info_message
 from utils.aws import upload_avatar
 from typing import Optional
 
@@ -43,7 +44,7 @@ async def get_chat_by_id(chat_id: int, session: AsyncSession):
 
 
 async def get_group_chat_by_id_with_users(chat_id: int, session: AsyncSession):
-    return (await session.execute(select(GroupChat).filter_by(id=chat_id).options(selectinload(GroupChat.users))))\
+    return (await session.execute(select(GroupChat).filter_by(id=chat_id).options(selectinload(GroupChat.users)))) \
         .scalar_one_or_none()
 
 
@@ -56,24 +57,25 @@ async def get_direct_chat_by_id(chat_id: int, session: AsyncSession):
 
 
 async def get_added_deleted_user_history(user_id: int, chat_id: int, session: AsyncSession):
-    return (await session.execute(select(AddedDeletedUserHistory).filter_by(user_id=user_id, chat_id=chat_id)))\
+    return (await session.execute(select(AddedDeletedUserHistory).filter_by(user_id=user_id, chat_id=chat_id))) \
         .scalar_one_or_none()
 
 
 async def get_deleted_history(user_id: int, chat_id: int, session: AsyncSession):
-    return (await session.execute(select(DeletedHistory).filter_by(user_id=user_id, chat_id=chat_id)))\
+    return (await session.execute(select(DeletedHistory).filter_by(user_id=user_id, chat_id=chat_id))) \
         .scalar_one_or_none()
 
 
 async def get_read_date(chat_id: int, user_id: int, session: AsyncSession):
-    read_date = (await session.execute(select(ReadDate).filter_by(chat_id=chat_id, user_id=user_id))).scalar_one_or_none()
+    read_date = (
+        await session.execute(select(ReadDate).filter_by(chat_id=chat_id, user_id=user_id))).scalar_one_or_none()
     return read_date
 
 
 async def get_read_date_from_others(chat_id: int, user_id: int, session: AsyncSession):
     read_date = (await session.execute(
         select(ReadDate).filter_by(chat_id=chat_id).filter(ReadDate.user_id != user_id))
-            ).scalar_one_or_none()
+                 ).scalar_one_or_none()
     if read_date:
         return read_date.date
     return None
@@ -82,6 +84,7 @@ async def get_read_date_from_others(chat_id: int, user_id: int, session: AsyncSe
 async def get_left_chat(chat_id: int, user_id: int, session: AsyncSession):
     return (await session.execute(select(LeftGroupChat)
                                   .filter_by(chat_id=chat_id, user_id=user_id))).scalar_one_or_none()
+
 
 async def check_if_user_in_chat(chat_id: int, user_id: int, session: AsyncSession):
     return (await session.execute(
@@ -170,13 +173,17 @@ async def edit_group_chat(chat_id: int, data: EditGroupChatScheme, user_id: int,
             avatar = await upload_avatar(data.avatar, chat_id, 'chat')
             chat.avatar = avatar
         new_users, delete_users = [], []
+        creator = None
+        new_users_message, deleted_users_message = None, None
         if data.add_users_ids:
             for new_user_id in data.add_users_ids:
                 new_user = await get_user_by_id(new_user_id, session)
                 if new_user not in chat.users:
                     if left_chat := await get_left_chat(chat_id, new_user.id, session):
-                        if (left_chat.return_dates and left_chat.leave_dates[-1] > left_chat.return_dates[-1]) or (not left_chat.return_dates):
-                            raise HTTPException(403, f"You cannot add user with id '{new_user.id}' because he left this chat")
+                        if (left_chat.return_dates and left_chat.leave_dates[-1] > left_chat.return_dates[-1]) or (
+                        not left_chat.return_dates):
+                            raise HTTPException(403,
+                                                f"You cannot add user with id '{new_user.id}' because he left this chat")
                     new_users.append(new_user)
                     chat.users.append(new_user)
                     if ad_history := await get_added_deleted_user_history(new_user_id, chat_id, session):
@@ -188,20 +195,35 @@ async def edit_group_chat(chat_id: int, data: EditGroupChatScheme, user_id: int,
                         session.add(ad_history)
                 else:
                     raise HTTPException(400, f"User with id '{new_user.id}' is already in chat")
+            creator = await get_user_by_id(user_id, session)
+            new_users_message = await create_info_message(chat_id=chat_id,
+                                                          session=session, info_type=InfoMessageTypes.ADD_USERS.value,
+                                                          new_users=new_users, user=creator)
 
         if data.delete_users_ids:
             for delete_user_id in data.delete_users_ids:
                 delete_user = await get_user_by_id(delete_user_id, session)
                 if delete_user in chat.users:
                     delete_users.append(delete_user)
-                    chat.users.remove(delete_user)
-                    ad_history = await get_added_deleted_user_history(delete_user_id, chat_id, session)
-                    ad_history.deleted_dates.append(datetime.utcnow())
-                    flag_modified(ad_history, "deleted_dates")
+                    # chat.users.remove(delete_user)
+                    # ad_history = await get_added_deleted_user_history(delete_user_id, chat_id, session)
+                    # ad_history.deleted_dates.append(datetime.utcnow())
+                    # flag_modified(ad_history, "deleted_dates")
                 else:
                     raise HTTPException(400, f"User with id '{delete_user.id}' is not in chat")
+            if not creator:
+                creator = await get_user_by_id(user_id, session)
+            deleted_users_message = await create_info_message(chat_id=chat_id,
+                                                              session=session,
+                                                              info_type=InfoMessageTypes.DELETE_USERS.value,
+                                                              deleted_users=delete_users, user=creator)
+            for delete_user in delete_users:
+                chat.users.remove(delete_user)
+                ad_history = await get_added_deleted_user_history(delete_user.id, chat_id, session)
+                ad_history.deleted_dates.append(datetime.utcnow())
+                flag_modified(ad_history, "deleted_dates")
         await session.flush()
-        return chat, new_users, delete_users
+        return chat, new_users_message, deleted_users_message
     raise HTTPException(403, "You can't edit chat information")
 
 

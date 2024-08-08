@@ -10,6 +10,7 @@ from db.utils.user import update_online_and_get_session, update_online_and_get_s
 from utils.chat import connect_func, create_group_chat_func, create_direct_chat_func, get_my_chats_func, \
     edit_group_chat_func, block_direct_chat_func, unblock_direct_chat_func, read_messages_func, leave_group_chat_func, \
     return_to_group_chat_func
+from db.utils.message import get_message_by_id_check
 from schemes.chat import GroupChatScheme, DirectChatScheme, GroupChatResponseScheme, DirectChatResponseScheme, \
     EditGroupChatScheme, GroupChatResponseSchemeWithUsers
 
@@ -53,9 +54,11 @@ async def create_direct_chat_path(chat_data: DirectChatScheme,
 
 @chat_router.put('/edit-group-chat/{chat_id}', response_model=GroupChatResponseSchemeWithUsers)
 async def edit_group_chat_path(chat_id: int, edit_data: EditGroupChatScheme,
-                               session: AsyncSession = Depends(update_online_and_get_session),
+                               session: AsyncSession = Depends(get_session),
                                token=Depends(get_current_user)):
-    return await edit_group_chat_func(chat_id, edit_data, token, session)
+    r = await edit_group_chat_func(chat_id, edit_data, token, session)
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 4545454545454777)
+    return r
 
 
 @chat_router.get('/get-my-chats', response_model=List[Union[GroupChatResponseScheme, DirectChatResponseScheme]])
