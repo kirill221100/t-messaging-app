@@ -77,7 +77,7 @@ async def get_read_date_from_others(chat_id: int, user_id: int, session: AsyncSe
         select(ReadDate).filter_by(chat_id=chat_id).filter(ReadDate.user_id != user_id))
                  ).scalar_one_or_none()
     if read_date:
-        return read_date.date
+        return read_date
     return None
 
 

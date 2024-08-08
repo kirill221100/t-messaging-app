@@ -15,5 +15,5 @@ async def get_messages_by_chat_id_func(chat_id: int, user_id: int, session: Asyn
         others_read_date = await get_read_date_from_others(chat_id, user_id, session)
         messages = await get_messages_by_chat_id(chat_id, session, deleted_history, ad_history, left_chat_history,
                                                  count, last_message_id)
-        return {'my_read_date': my_read_date, 'others_read_date': others_read_date, 'messages': messages}
+        return {'my_read_date': my_read_date.date, 'others_read_date': others_read_date.date, 'messages': messages}
     raise HTTPException(403, 'You are not a member of this chat')

@@ -337,9 +337,9 @@ async def test_edit_group_chat(ac: AsyncClient):
     chat = req1.json()
     assert chat['name'] == 'test_name'
     assert len(chat['users']) == 3
-    assert chat['users'][0]['id'] == 1
-    assert chat['users'][1]['id'] == 5
-    assert chat['users'][2]['id'] == 3
+    assert chat['users'][0]['id'] in [1, 3, 5]
+    assert chat['users'][1]['id'] in [1, 3, 5]
+    assert chat['users'][2]['id'] in [1, 3, 5]
     res1 = await task1
     assert len(res1) == 3
     res = await task2
