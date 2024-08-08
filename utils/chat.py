@@ -14,6 +14,7 @@ from schemes.chat import GroupChatScheme, DirectChatScheme, GroupChatResponseSch
 from db.utils.chat import create_group_chat, create_direct_chat, get_chats_by_user_id, ChatTypes, edit_group_chat, \
     block_direct_chat, unblock_direct_chat, read_messages, check_if_user_in_chat_with_polymorphic, get_left_chat, create_left_chat, \
     get_group_chat_by_id_with_users, get_added_deleted_user_history
+from db.utils.message import get_message_by_id_check
 from db.models.message import InfoMessageTypes
 from db.db_setup import get_session
 import json
@@ -27,6 +28,7 @@ async def chat_check(chat_id: int, user_id: int, session: AsyncSession, ws: WebS
     if chat := await check_if_user_in_chat_with_polymorphic(chat_id, user_id, session):
         if chat.type == ChatTypes.DIRECT.value:
             if chat.blocked_by_id:
+                await message_manager.disconnect_from_many(ws, channels, user_id)
                 raise WebSocketException(1008, "Chat is blocked")
         return True
     await message_manager.disconnect_from_many(ws, channels, user_id)
@@ -57,8 +59,12 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                 if msg_type := message_json.get('message_type'):
                     message, message_model = None, None
                     try:
+                        await session.refresh(user)
+                        channels = [f"chat_{chat.id}" for chat in user.chats]
                         await chat_check(message_json['chat_id'], user_id, session, ws, channels)
                     except KeyError:
+                        # await session.refresh(user)
+                        # channels = [f"chat_{chat.id}" for chat in user.chats]
                         await message_manager.disconnect_from_many(ws, channels, user_id)
                         raise WebSocketException(1007, "There is no chat_id")
                     try:
@@ -70,7 +76,8 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                             try:
                                 message = await edit_message(message_model, session)
                             except WebSocketException as e:
-                                await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
+                                await message_manager.disconnect_from_many(ws, channels, user_id)
+                                #await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                                 raise e
                         elif msg_type == WSMessageTypes.DELETE_MESSAGE.value:
                             message_model = WSMessageSchemeDelete.model_validate_json(json.dumps(message_json))
@@ -80,14 +87,18 @@ async def connect_func(ws: WebSocket, token: dict, session: AsyncSession):
                         else:
                             json_message = jsonable_encoder(message_model)
                     except ValidationError as e:
-                        await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
+                        await message_manager.disconnect_from_many(ws, channels, user_id)
+                        #await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                         raise WebSocketException(1007, e.errors()[0]['msg'])
                     data = {"ws_type": msg_type, "msg": json_message}
                     await message_manager.send_message_to_room(f"chat_{str(json_message['chat_id'])}", data)
                 else:
-                    await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
+                    await message_manager.disconnect_from_many(ws, channels, user_id)
+                    #await message_manager.disconnect(ws, f"chat_{message_json['chat_id']}")
                     raise WebSocketException(1007, "There is no message_type")
         except (WebSocketDisconnect, RuntimeError) as e:
+            await session.refresh(user)
+            channels = [f"chat_{chat.id}" for chat in user.chats]
             await message_manager.disconnect_from_many(ws, channels, user_id)
 
 
@@ -116,7 +127,7 @@ async def create_direct_chat_func(chat_data: DirectChatScheme, token: dict, sess
     return res
 
 
-async def get_users_chats_func(token: dict, session: AsyncSession):
+async def get_my_chats_func(token: dict, session: AsyncSession):
     chats = await get_chats_by_user_id(token['user_id'], session)
     resp = []
     for chat in chats:
@@ -131,7 +142,12 @@ async def get_users_chats_func(token: dict, session: AsyncSession):
 
 
 async def edit_group_chat_func(chat_id: int, data: EditGroupChatScheme, token: dict, session: AsyncSession):
-    chat, new_users, delete_users = await edit_group_chat(chat_id, data, token['user_id'], session)
+    # print('-----')
+    # try:
+    #     print((await get_message_by_id_check(7, session)).new_users[0].id, 4545454545454777)
+    # except:
+    #     pass
+    chat, new_users_message, delete_users_message = await edit_group_chat(chat_id, data, token['user_id'], session)
     user = await get_user_by_id(token['user_id'], session)
     messages = []
     if data.avatar:
@@ -142,23 +158,23 @@ async def edit_group_chat_func(chat_id: int, data: EditGroupChatScheme, token: d
         messages.append(await create_info_message(chat_id=chat_id,
                                                   session=session, info_type=InfoMessageTypes.CHANGE_NAME.value,
                                                   new_name=chat.name, user=user))
-    if new_users:
-        messages.append(await create_info_message(chat_id=chat_id,
-                                                  session=session, info_type=InfoMessageTypes.ADD_USERS.value,
-                                                  new_users=new_users, user=user))
+    if new_users_message:
+        messages.append(new_users_message)
         await message_manager.connect_added_users(data.add_users_ids, f"chat_{chat_id}")
-    if delete_users:
-        messages.append(await create_info_message(chat_id=chat_id,
-                                                  session=session, info_type=InfoMessageTypes.DELETE_USERS.value,
-                                                  deleted_users=delete_users, user=user))
-        await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
-    await session.commit()
+    if delete_users_message:
+        messages.append(delete_users_message)
+        #await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 4545454545454777)
 
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 232323)
     for msg in messages:
         ws_data = {"ws_type": WSMessageTypes.INFO.value,
                    "msg": jsonable_encoder(InfoMessageResponseScheme.from_orm(msg))}
         await message_manager.send_message_to_room(f"chat_{chat_id}", ws_data)
-
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 232323)
+    await session.commit()
+    if delete_users_message:
+        await message_manager.disconnect_deleted_users(data.delete_users_ids, f"chat_{chat_id}")
     return chat
 
 

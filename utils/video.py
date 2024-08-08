@@ -14,12 +14,10 @@ path = Path.cwd()
 
 
 async def compress_video(vid: bytes):
-    logging.warning(3)
     video = BytesIO(vid)
     async with aiofiles.tempfile.NamedTemporaryFile('wb', delete=False) as temp:
         await temp.write(video.read())
     video.close()
-    logging.warning(4)
     video_path = path.absolute().joinpath(f'{config.VIDEO_PATH}/{uuid4()}.mp4')
     temp_path = path.absolute().joinpath(temp.name)
     pr = await asyncio.create_subprocess_exec(
@@ -35,7 +33,6 @@ async def compress_video(vid: bytes):
     # )
     #
     # await process.execute()
-    logging.warning(6)
     os.remove(temp_path)
     return video_path
 

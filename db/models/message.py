@@ -59,6 +59,6 @@ class InfoMessage(Message):
     info_type: Mapped[InfoMessageTypes] = mapped_column(String(50), nullable=True)
     new_name: Mapped[str] = mapped_column(nullable=True)
     new_avatar: Mapped[str] = mapped_column(nullable=True)
-    new_users: Mapped[List["User"]] = relationship(uselist=True, lazy='selectin')
-    deleted_users: Mapped[List["User"]] = relationship(uselist=True, lazy='selectin')
+    new_users: Mapped[List["User"]] = relationship(uselist=True, lazy='selectin', secondary="new_users_association_table", back_populates='new_user_messages')
+    deleted_users: Mapped[List["User"]] = relationship(uselist=True, lazy='selectin', secondary="delete_users_association_table", back_populates='deleted_user_messages')
 

@@ -91,11 +91,10 @@ class MessageManager:
     #         await asyncio.wait([subscribe_and_listen_to_channel_task, waiting_task],
     #                            return_when=asyncio.FIRST_COMPLETED)
     async def connect_added_user(self, user_id: int, channel: str):
-        if (room := self.active_connections.get(channel)) and room is None:
+        if not (room := self.active_connections.get(channel)) and room is None:
             room = []
-        logging.warning(room)
-        if ws := self.users_websockets.get(user_id)[-1]:
-            room.append(ws)
+        if ws := self.users_websockets.get(user_id):
+            room.append(ws[-1])
         if not self.active_connections.get(channel):
             self.active_connections[channel] = room
             subscribe_and_listen_to_channel_task = asyncio.create_task(self._subscribe_and_listen_to_channel(channel))
@@ -138,10 +137,8 @@ class MessageManager:
             await self._consume_events(msg['channel'].decode('utf-8'), msg)
 
     async def _subscribe_and_listen_to_channel(self, channel: str):
-        logging.warning([channel, self.active_connections, 3333])
         await redis.subscribe(channel)
         async for msg in redis.psub.listen():
-            logging.warning(msg)
             await self._consume_events(channel, msg)
 
     async def _consume_events(self, channel, message):
@@ -154,10 +151,10 @@ class MessageManager:
                     if connection.application_state == WebSocketState.CONNECTED:
                         await connection.send_json(message)
                 except (WebSocketDisconnect, RuntimeError) as e:
-                    await self.disconnect_from_many(connection, channel, json.loads(message['data'])['msg']['user_id'])
+                    await self.disconnect(connection, channel)
 
     async def send_message_to_room(self, channel: str, message):
-        if message_manager.active_connections.get(channel):
+        if (ch := message_manager.active_connections.get(channel)) and ch != []:
             await redis.publish(channel, json.dumps(message))
 
 

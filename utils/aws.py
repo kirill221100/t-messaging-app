@@ -41,19 +41,15 @@ async def upload_photos(photos: List[UploadFile], chat_id: int, user_id: int):
 async def upload_videos(videos: List[UploadFile], chat_id: int, user_id: int):
     session = aioboto3.Session(aws_access_key_id=config.AWS_ACCESS_KEY,
                                aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY)
-    logging.warning(1)
     async with session.resource("s3", endpoint_url=config.AWS_ENDPOINT_URL) as s3:
         res = []
         for video in videos:
             rand_name = ''.join(random.choices(string.ascii_letters, k=10))
-            logging.warning(2)
             vid_path = await compress_video(await video.read())
-            logging.warning(6)
             obj = await s3.Object(config.AWS_BUCKET, f'chat/{chat_id}/videos/{rand_name}_{user_id}_{len(res)}.mp4')
             async with aiofiles.open(vid_path, 'rb') as v:
                 r = await obj.put(Body=await v.read())
                 res.append(f"https://ipfs.filebase.io/ipfs/{r['ResponseMetadata']['HTTPHeaders']['x-amz-meta-cid']}")
-            logging.warning(7)
             os.remove(vid_path)
         return res
 

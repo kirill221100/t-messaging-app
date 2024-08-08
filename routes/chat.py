@@ -1,14 +1,16 @@
+import datetime
 from typing import List, Union, Optional
-from fastapi import APIRouter, Depends, WebSocket, BackgroundTasks
+from fastapi import APIRouter, Depends, WebSocket, HTTPException
 from security.auth import get_current_user_ws, get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models.chat import ChatTypes
 from db.db_setup import get_session
 from db.utils.chat import delete_chat_history_for_user, get_chat_by_id_polymorphic_with_users
 from db.utils.user import update_online_and_get_session, update_online_and_get_session_ws
-from utils.chat import connect_func, create_group_chat_func, create_direct_chat_func, get_users_chats_func, \
+from utils.chat import connect_func, create_group_chat_func, create_direct_chat_func, get_my_chats_func, \
     edit_group_chat_func, block_direct_chat_func, unblock_direct_chat_func, read_messages_func, leave_group_chat_func, \
     return_to_group_chat_func
+from db.utils.message import get_message_by_id_check
 from schemes.chat import GroupChatScheme, DirectChatScheme, GroupChatResponseScheme, DirectChatResponseScheme, \
     EditGroupChatScheme, GroupChatResponseSchemeWithUsers
 
@@ -21,13 +23,19 @@ async def connect_path(ws: WebSocket, session: AsyncSession = Depends(update_onl
     return await connect_func(ws, token, session)
 
 
-@chat_router.get('/get-chat/{chat_id}', response_model=Union[GroupChatResponseSchemeWithUsers, DirectChatResponseScheme])
+@chat_router.get('/get-chat/{chat_id}',
+                 response_model=Union[GroupChatResponseSchemeWithUsers, DirectChatResponseScheme])
 async def get_chat_path(chat_id: int, session: AsyncSession = Depends(get_session)):
     chat = await get_chat_by_id_polymorphic_with_users(chat_id, session)
+    if not chat:
+        raise HTTPException(404, 'No such chat')
     if chat.type == ChatTypes.GROUP.value:
         return GroupChatResponseSchemeWithUsers.from_orm(chat)
     elif chat.type == ChatTypes.DIRECT.value:
-        return DirectChatResponseScheme.from_orm(chat)
+        res = DirectChatResponseScheme.from_orm(chat)
+        res.first_user = chat.users[0]
+        res.second_user = chat.users[1]
+        return res
 
 
 @chat_router.post('/create-group-chat', response_model=GroupChatResponseScheme)
@@ -44,40 +52,41 @@ async def create_direct_chat_path(chat_data: DirectChatScheme,
     return await create_direct_chat_func(chat_data, token, session)
 
 
-@chat_router.put('/edit-group-chat/{chat_id}')
+@chat_router.put('/edit-group-chat/{chat_id}', response_model=GroupChatResponseSchemeWithUsers)
 async def edit_group_chat_path(chat_id: int, edit_data: EditGroupChatScheme,
-                               session: AsyncSession = Depends(update_online_and_get_session),
+                               session: AsyncSession = Depends(get_session),
                                token=Depends(get_current_user)):
-    return await edit_group_chat_func(chat_id, edit_data, token, session)
+    r = await edit_group_chat_func(chat_id, edit_data, token, session)
+    #print((await get_message_by_id_check(7, session)).new_users[0].id, 4545454545454777)
+    return r
 
 
-@chat_router.get('/get-users-chats', response_model=List[Union[GroupChatResponseScheme, DirectChatResponseScheme]])
-async def get_users_chats_path(session: AsyncSession = Depends(update_online_and_get_session),
-                               token=Depends(get_current_user)):
-    #  сделать взятие последних сообщений
-    return await get_users_chats_func(token, session)
+@chat_router.get('/get-my-chats', response_model=List[Union[GroupChatResponseScheme, DirectChatResponseScheme]])
+async def get_my_chats_path(session: AsyncSession = Depends(update_online_and_get_session),
+                            token=Depends(get_current_user)):
+    return await get_my_chats_func(token, session)
 
 
-@chat_router.delete('/delete-my-chat-history/{chat_id}')
+@chat_router.delete('/delete-my-chat-history/{chat_id}', response_model=dict)
 async def delete_my_chat_history_path(chat_id: int, session: AsyncSession = Depends(update_online_and_get_session),
                                       token=Depends(get_current_user)):
     """Deletes only user's personal chat history"""
     return await delete_chat_history_for_user(token['user_id'], chat_id, session)
 
 
-@chat_router.patch('/block-direct-chat/{chat_id}')
+@chat_router.patch('/block-direct-chat/{chat_id}', response_model=dict)
 async def block_direct_chat_path(chat_id: int, session: AsyncSession = Depends(update_online_and_get_session),
                                  token=Depends(get_current_user)):
     return await block_direct_chat_func(chat_id, token['user_id'], session)
 
 
-@chat_router.patch('/unblock-direct-chat/{chat_id}')
+@chat_router.patch('/unblock-direct-chat/{chat_id}', response_model=dict)
 async def unblock_direct_chat_path(chat_id: int, session: AsyncSession = Depends(update_online_and_get_session),
                                    token=Depends(get_current_user)):
     return await unblock_direct_chat_func(chat_id, token['user_id'], session)
 
 
-@chat_router.patch('/read-messages/{chat_id}')
+@chat_router.patch('/read-messages/{chat_id}', response_model=dict)
 async def read_messages_path(chat_id: int, message_id: Optional[int] = None,
                              session: AsyncSession = Depends(update_online_and_get_session),
                              token=Depends(get_current_user)):
