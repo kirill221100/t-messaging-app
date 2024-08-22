@@ -36,9 +36,10 @@ services:
       - "${POSTGRES_PORT}:5432"
 
   celery:
+    build: .
     command: celery -A utils.celery_tasks:celery worker --loglevel=info --logfile=logs/celery.log
     volumes:
-      - ./project:/usr/src/app
+      - ./:/app
     depends_on:
       redis:
         condition: service_started
