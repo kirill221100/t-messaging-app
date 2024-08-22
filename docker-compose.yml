@@ -13,9 +13,9 @@ services:
       celery:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
 
   db:
     image: postgres:15-alpine
@@ -42,9 +42,9 @@ services:
       - ./:/app
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
 
   redis:
     image: redis:7
