@@ -61,7 +61,7 @@ Pillow==9.1.1
 pluggy==1.5.0
 prometheus_client==0.20.0
 prompt_toolkit==3.0.47
-psycopg2==2.9.9
+psycopg2-binary
 pyasn1==0.5.1
 pydantic==2.6.1
 pydantic-settings==2.2.1
