@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from redis_utils.redis import redis
+from redis_utils.redis_utils import redis
 from config import config
 from routes.auth import auth_router
 from routes.user import user_router

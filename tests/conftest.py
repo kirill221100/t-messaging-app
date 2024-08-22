@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from pydantic_settings import SettingsConfigDict
 from typing import AsyncGenerator
-from httpx import AsyncClient
+from httpx import AsyncClient, Client
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 import config_setup
@@ -13,10 +13,12 @@ from asgi_lifespan import LifespanManager
 
 config_setup.Config.model_config = SettingsConfigDict(env_file='../.env')
 from config import config
-from db.db_setup import Base, get_session
+from db.db_setup import Base, get_session, get_sync_session
 from main import app
-from redis_utils.redis import redis
+from redis_utils.redis_utils import redis
 from httpx_ws.transport import ASGIWebSocketTransport
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 import fakeredis, types
 from db.models.user import User
 from security.jwt import create_access_token
@@ -27,6 +29,8 @@ test_engine = create_async_engine(
     f"postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_TEST_DB}",
     echo=False, poolclass=NullPool)
 test_session = async_sessionmaker(test_engine, expire_on_commit=False)
+test_sync_engine = create_engine(f"postgresql+psycopg2://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_TEST_DB}", echo=False, poolclass=NullPool)
+test_sync_session = sessionmaker(test_sync_engine, expire_on_commit=False)
 logging.basicConfig()
 logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
 Base.metadata.bind = test_engine
@@ -38,11 +42,17 @@ async def override_get_session() -> AsyncGenerator[AsyncClient, None]:
         yield session
 
 
+def override_get_sync_session():
+    with test_sync_session() as s:
+        yield s
+
+
 video_path = config.VIDEO_PATH
 config.VIDEO_PATH = f'../{video_path}'
 config.DEBUG = True
-
+base_url = "http://test"
 app.dependency_overrides[get_session] = override_get_session
+app.dependency_overrides[get_sync_session] = override_get_sync_session
 
 
 @pytest.fixture(scope='session')
@@ -51,8 +61,10 @@ def anyio_backend():
 
 
 async def alt_fun(self) -> None:
-    self.connection = fakeredis.FakeAsyncRedis()
+    self.server = fakeredis.FakeServer()
+    self.connection = fakeredis.FakeAsyncRedis(db=0, server=self.server)
     self.psub = self.connection.pubsub()
+    self.sync_connection = fakeredis.FakeRedis(db=0, server=self.server)
 
 
 redis.create_connections = types.MethodType(alt_fun, redis)
@@ -125,5 +137,6 @@ client = TestClient(app)
 @pytest.fixture(scope='function')
 async def ac() -> AsyncGenerator[AsyncClient, None]:
     async with LifespanManager(app):
-        async with AsyncClient(app=app, base_url="http://test", transport=ASGIWebSocketTransport(app=app)) as ac:
+        async with AsyncClient(app=app, base_url=base_url, transport=ASGIWebSocketTransport(app=app)) as ac:
             yield ac
+

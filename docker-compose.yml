@@ -10,7 +10,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      celery:
+        condition: service_healthy
       redis:
+        condition: service_started
+      rabbitmq:
         condition: service_started
 
   db:
@@ -30,6 +34,17 @@ services:
       retries: 5
     ports:
       - "${POSTGRES_PORT}:5432"
+
+  celery:
+    command: celery -A utils.celery_tasks:celery worker --loglevel=info --logfile=logs/celery.log
+    volumes:
+      - ./project:/usr/src/app
+    depends_on:
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
   redis:
     image: redis:7
     container_name: redis
@@ -42,6 +57,14 @@ services:
     expose:
       - 6379
     command: redis-server --requirepass $REDIS_PASSWORD
+
+  rabbitmq:
+    image: 'rabbitmq:latest'
+    ports:
+      - '5672:5672'
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
 volumes:
   postgres_data:
 

@@ -3,7 +3,8 @@ from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from schemes.auth import RegisterScheme, LoginEmailResponseScheme
 from utils.auth import email_reg_send_func, email_reg_func, login_func, email_login_func
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.db_setup import get_session
+from sqlalchemy.orm import Session
+from db.db_setup import get_session, get_sync_session
 from db.utils.user import get_user_by_id
 from security.jwt import create_access_token, verify_refresh_token
 from pydantic import EmailStr
@@ -13,9 +14,9 @@ auth_router = APIRouter()
 
 
 @auth_router.post('/email-reg-send')
-async def email_reg_send_path(reg_data: RegisterScheme, back_tasks: BackgroundTasks,
-                              session: AsyncSession = Depends(get_session)):
-    return await email_reg_send_func(reg_data, back_tasks, session)
+def email_reg_send_path(reg_data: RegisterScheme,
+                        session: Session = Depends(get_sync_session)):
+    return email_reg_send_func(reg_data, session)
 
 
 @auth_router.get('/email-reg', response_model=LoginEmailResponseScheme)
@@ -24,9 +25,9 @@ async def email_reg_path(email: EmailStr, code: int, session: AsyncSession = Dep
 
 
 @auth_router.post('/login')
-async def login_path(email: EmailStr, back_tasks: BackgroundTasks,
-                     session: AsyncSession = Depends(get_session)):
-    return await login_func(email, back_tasks, session)
+def login_path(email: EmailStr,
+               session: Session = Depends(get_sync_session)):
+    return login_func(email, session)
 
 
 @auth_router.post('/login-for-debug')

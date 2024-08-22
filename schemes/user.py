@@ -18,7 +18,6 @@ class UserResponseScheme(BaseModel):
 
 class EditUserScheme(BaseModel):
     username: Optional[str] = None
-    email: Optional[EmailStr] = None
     avatar: Optional[str] = None
     description: Optional[str] = None
 

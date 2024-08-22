@@ -4,6 +4,7 @@ import random
 import logging
 from typing import List, Dict, Optional
 from redis import asyncio as aioredis
+from redis import Redis as r
 #import aioredis
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -15,10 +16,12 @@ class Redis:
         self.psub = None
         self.url = f"redis://{config.REDIS_USER}:{config.REDIS_PASSWORD}@{config.REDIS_URL}"
         self.connection = None
+        self.sync_connection = None
 
     async def create_connections(self) -> None:
         self.connection = aioredis.from_url(self.url, db=0)
         self.psub = self.connection.pubsub()
+        self.sync_connection = r.from_url(self.url, db=0)
 
     async def delete_connections(self) -> None:
         await self.connection.aclose()
@@ -161,15 +164,17 @@ class MessageManager:
 message_manager = MessageManager()
 
 
-async def create_email_code(email: str, username: Optional[str] = None):
+def create_email_code(email: str, username: Optional[str] = None):
     code = random.randint(100000, 999999)
-    await redis.connection.set(email, json.dumps({"code": code, "username": username}), ex=600)
+    print(json.dumps({"code": code, "username": username}))
+    redis.sync_connection.set(email, json.dumps({"code": code, "username": username}), ex=600)
     return code
 
 
-async def create_email_change_code(user_id: int, email: str):
+def create_email_change_code(user_id: int, email: str):
     code = random.randint(100000, 999999)
-    await redis.connection.set(user_id, json.dumps({"code": code, 'email': email}), ex=600)
+    print(json.dumps({"code": code, "email": email}))
+    redis.sync_connection.set(user_id, json.dumps({"code": code, "email": email}), ex=600)
     return code
 
 

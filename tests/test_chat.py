@@ -7,7 +7,7 @@ import json
 import string
 import base64
 from schemes.chat import GroupChatScheme, DirectChatScheme
-from redis_utils.redis import message_manager
+from redis_utils.redis_utils import message_manager
 import random
 import datetime
 from schemes.message import WSMessageTypes
