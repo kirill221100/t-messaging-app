@@ -10,12 +10,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      celery:
-        condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      celery:
+        condition: service_started
 
   db:
     image: postgres:15-alpine
@@ -33,13 +33,24 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5432:5432"
 
   celery:
     build: .
-    command: celery -A utils.celery_tasks:celery worker --loglevel=info --logfile=logs/celery.log
+    command: celery -A utils.celery_tasks:celery worker --loglevel=debug --logfile=logs/celery.log
+    environment:
+      - CELERY_RESULT_BACKEND="redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_URL}"
+      - CELERY_BROKER_TRANSPORT_URL="amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672"
+    healthcheck:
+          test: ["CMD-SHELL", "celery inspect ping --destination celery@$$HOSTNAME"]
+          interval: 60s
+          timeout: 10s
+          retries: 10
+          start_period: 60s
     volumes:
       - ./:/app
+    env_file: .env_prod
+    restart: always
     depends_on:
       redis:
         condition: service_healthy
@@ -51,6 +62,11 @@ services:
     container_name: redis
     restart: unless-stopped
     env_file: .env_prod
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
@@ -61,6 +77,11 @@ services:
 
   rabbitmq:
     image: 'rabbitmq:latest'
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
     ports:
       - '5672:5672'
     environment:
