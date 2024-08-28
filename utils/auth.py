@@ -3,25 +3,28 @@ from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from schemes.auth import RegisterScheme, LoginEmailResponseScheme
 from schemes.user import UserResponseScheme
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from db.db_setup import get_session
-from db.utils.user import create_user, get_user_by_email, get_user_by_id, reg_edit_user, get_user_by_username
-from security.email import send_email_verification, send_login_email
+from db.utils.user import create_user, get_user_by_email, get_user_by_id, reg_edit_user, get_user_by_email_sync, get_user_by_username_sync
+#from security.email import send_email_verification, send_login_email
+from utils.celery_tasks import send_email_verification, send_login_email, send_email_changing
 from security.jwt import create_access_token, create_refresh_token, verify_refresh_token
-from redis_utils.redis import create_email_code, verify_email_code
+from redis_utils.redis_utils import create_email_code, verify_email_code
 from pydantic import EmailStr
 from config import config
 
 
-async def email_reg_send_func(reg_data: RegisterScheme, back_tasks: BackgroundTasks, session: AsyncSession):
-    if await get_user_by_email(reg_data.email, session):
+def email_reg_send_func(reg_data: RegisterScheme, session: Session):
+    if get_user_by_email_sync(reg_data.email, session):
         raise HTTPException(status_code=409, detail='Email already registered')
-    if await get_user_by_username(reg_data.username, session):
+    if get_user_by_username_sync(reg_data.username, session):
         raise HTTPException(status_code=409, detail='Username already registered')
-    verification_code = await create_email_code(reg_data.email, reg_data.username)
+    verification_code = create_email_code(reg_data.email, reg_data.username)
     if config.DEBUG:
         return verification_code
-    await send_email_verification(reg_data.email, verification_code, back_tasks)
-    return {'msg': 'подтвердите почту, введя код присланный на email'}
+    task = send_email_verification.delay(reg_data.email, verification_code)
+    #await send_email_verification(reg_data.email, verification_code, back_tasks)
+    return {'msg': 'Подтвердите почту, введя код присланный на email'}
 
 
 async def email_reg_func(email: EmailStr, code: int, session: AsyncSession):
@@ -33,12 +36,12 @@ async def email_reg_func(email: EmailStr, code: int, session: AsyncSession):
     raise HTTPException(status_code=400, detail='Incorrect code')
 
 
-async def login_func(email: EmailStr, back_tasks: BackgroundTasks, session: AsyncSession):
-    if await get_user_by_email(email, session):
-        verification_code = await create_email_code(email)
+def login_func(email: EmailStr, session: Session):
+    if get_user_by_email_sync(email, session):
+        verification_code = create_email_code(email)
         if config.DEBUG:
             return verification_code
-        await send_login_email(email, verification_code, back_tasks)
+        task = send_login_email.delay(email, verification_code)
         return {'msg': 'подтвердите вход, введя код присланный на email'}
     raise HTTPException(404, 'No such user')
 

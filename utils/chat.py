@@ -5,7 +5,7 @@ from fastapi import WebSocket, WebSocketDisconnect, WebSocketException, Backgrou
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 from db.utils.user import get_user_by_id_with_chats, get_user_by_id
-from redis_utils.redis import message_manager
+from redis_utils.redis_utils import message_manager
 from schemes.message import WSMessageTypes, MessageResponseScheme, WSMessageSchemeCreate, WSMessageSchemeEdit, \
     WSMessageSchemeDelete, InfoMessage, InfoMessageResponseScheme
 from schemes.user import UserResponseScheme

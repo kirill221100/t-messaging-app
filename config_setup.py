@@ -32,6 +32,9 @@ class Config(BaseSettings):
     AWS_BUCKET: str
     MAX_PHOTO_SIZE_MB: int
     MAX_VIDEO_SIZE_MB: int
+    RABBITMQ_USER: str
+    RABBITMQ_PASS: str
+    CELERY_RESULT_EXP: int
     model_config = SettingsConfigDict(env_file='.env')
 
 

@@ -4,7 +4,7 @@ services:
     build: .
     ports:
       - 80:80
-    command: bash -c "cd tests && pytest -s"
+    command: bash -c "cd tests && pytest"
     environment:
       APP_NAME: "t_base"
     depends_on:

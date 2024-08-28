@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from redis_utils.redis import redis
+from redis_utils.redis_utils import redis
 from config import config
 from routes.auth import auth_router
 from routes.user import user_router
@@ -36,4 +36,4 @@ app.include_router(message_router, prefix='/message', tags=['message'])
 
 
 if __name__ == '__main__':
-    uvicorn.run('main:app', reload=False, ws_ping_interval=None, timeout_keep_alive=60)
+    uvicorn.run('main:app', reload=True, ws_ping_interval=None, timeout_keep_alive=60)
