@@ -18,6 +18,7 @@ services:
         condition: service_started
 
   db:
+    container_name: db
     image: postgres:15-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data/
@@ -36,6 +37,7 @@ services:
       - "5432:5432"
 
   celery:
+    container_name: celery
     build: .
     command: celery -A utils.celery_tasks:celery worker --loglevel=debug --logfile=logs/celery.log
     environment:
@@ -63,13 +65,17 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
-      - ./redis_utils/data:/data
+      - redis-data:/data
     expose:
       - 6379
     command: redis-server --requirepass $REDIS_PASSWORD
 
   rabbitmq:
+    container_name: rabbitmq
     image: 'rabbitmq:latest'
+    volumes:
+      - rabbitmq-log:/var/log/rabbitmq
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 5s
@@ -82,4 +88,8 @@ services:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
 volumes:
   postgres_data:
+  redis-data:
+  rabbitmq-log:
+  rabbitmq-data:
+
 

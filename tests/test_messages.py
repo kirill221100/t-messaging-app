@@ -1,20 +1,8 @@
-import asyncio
-import logging
 from httpx import AsyncClient
 import pytest
-from schemes.chat import GroupChatScheme, DirectChatScheme
-import random
-import datetime
-from httpx_ws import aconnect_ws
-from schemes.message import WSMessageTypes
-from schemes.chat import EditGroupChatScheme, ChatTypes
+from schemes.chat import EditGroupChatScheme
 from db.models.message import DefaultMessage, MessageTypes, InfoMessageTypes
 from tests.conftest import tokens, test_session
-from tests.test_chat import second_user_ws
-from sqlalchemy import select
-from config import config
-from db.utils.chat import get_read_date
-from db.utils.message import get_message_by_id_check
 
 
 @pytest.mark.anyio
